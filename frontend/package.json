@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "test:e2e": "node tests/e2e/runner.js"
+    "lint": "eslint"
   },
   "dependencies": {
     "@bprogress/next": "^3.2.12",

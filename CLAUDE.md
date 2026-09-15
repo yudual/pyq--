@@ -10,26 +10,24 @@ Kanle is a WeChat-Moments-style personal blog. It has two independently run Node
 - `backend/` — Express 5 API with Sequelize/MySQL. Domain routers live in `src/routes/`, data models and associations in `src/models/`, cross-cutting middleware in `src/middleware/`, and integrations/storage logic in `src/services/`.
 - `deploy/nginx.conf` — VPS deployment proxy/static-file configuration. Both apps have PM2 ecosystem configs.
 
-The nested `backend/backend/` directory is not the backend application; use `backend/package.json` and `backend/src/`.
-
 ## Commands
 
-Run commands from the relevant application directory. Project documentation uses pnpm; equivalent `npm run <script>` commands are also supported by the checked-in `package.json` scripts and lockfiles.
+Run commands from the relevant application directory. This project uses pnpm.
 
 ```bash
 # frontend/
-npm install
-npm run dev       # Next development server (normally port 3000)
-npm run lint      # ESLint across the frontend
-npm run build     # production build
-npm start         # serve the production build
+pnpm install
+pnpm dev          # Next development server (normally port 3000)
+pnpm lint         # ESLint across the frontend
+pnpm build        # production build
+pnpm start        # serve the production build
 
 # backend/
-npm install
-npm run dev       # nodemon + TypeScript backend (normally port 4000)
-npm run build     # compile TypeScript to dist/
-npm start         # run dist/index.js
-npm run db:init   # controlled, repeatable schema/default-data initialization
+pnpm install
+pnpm dev          # nodemon + TypeScript backend (normally port 4000)
+pnpm build        # compile TypeScript to dist/
+pnpm start        # run dist/index.js
+pnpm db:init       # controlled, repeatable schema/default-data initialization
 ```
 
 Additional backend maintenance scripts are declared in `backend/package.json`, including `db:reset-likes`, `db:migrate-douban-cache`, `db:migrate-font-family`, `db:migrate-footer-html`, `db:migrate-decoration-image`, and `music:migrate-r2`.
@@ -38,7 +36,7 @@ There are no first-party test files and no `test` script. The frontend has the o
 
 ## Local setup and request flow
 
-1. Create a MySQL-compatible database, configure `backend/.env` from `.env.example`, then run `npm run db:init` from `backend/`. This command creates missing tables, additive compatibility fields, site settings/default playlist, and an initial admin only when none exists.
+1. Create a MySQL-compatible database, configure `backend/.env` from `.env.example`, then run `pnpm db:init` from `backend/`. This command creates missing tables, additive compatibility fields, site settings/default playlist, and an initial admin only when none exists.
 2. Configure `frontend/.env.local` from `frontend/.env.example` and start both applications.
 3. Keep `NEXT_PUBLIC_API_URL=/api`. Browser requests go to the frontend origin and `frontend/next.config.ts` rewrites `/api/*` and `/uploads/*` to `BACKEND_URL`; server-side frontend requests use that absolute backend origin. Keep API/token behavior centralized through `frontend/src/lib/api-fetch.ts`.
 
