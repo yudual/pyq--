@@ -9,37 +9,17 @@ const nextConfig: NextConfig = {
   output: "standalone",
   staticPageGenerationTimeout: 300,
   images: {
+    unoptimized: true,
+    dangerouslyAllowLocalIP: true,
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "cravatar.cn",
-      },
-      {
-        protocol: "https",
-        hostname: "cravatar.com",
-      },
-      {
-        protocol: "https",
-        hostname: "cn.cravatar.com",
-      },
-      {
-        protocol: "https",
-        hostname: "api.dicebear.com",
-      },
-      {
-        protocol: "https",
-        hostname: "picsum.photos",
-      },
-      {
-        protocol: "https",
-        hostname: "kanle.net",
+        hostname: "**",
       },
       {
         protocol: "http",
-        hostname: "localhost",
-        port: "4000",
+        hostname: "**",
       },
-      ...(MEDIA_HOST ? [{ protocol: "https" as const, hostname: MEDIA_HOST }] : []),
     ],
   },
   async redirects() {
@@ -50,8 +30,98 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
+        source: "/posts",
+        destination: "/articles",
+        permanent: true,
+      },
+      {
+        source: "/project",
+        destination: "/projects",
+        permanent: true,
+      },
+      {
+        source: "/project/:id",
+        destination: "/projects/:id",
+        permanent: true,
+      },
+      {
+        source: "/article",
+        destination: "/articles",
+        permanent: true,
+      },
+      {
+        source: "/article/:id",
+        destination: "/articles/:id",
+        permanent: true,
+      },
+      {
+        source: "/moment",
+        destination: "/moments",
+        permanent: true,
+      },
+      {
+        source: "/moment/:id",
+        destination: "/moments/:id",
+        permanent: true,
+      },
+      {
+        source: "/admin/music",
+        destination: "/admin/settings",
+        permanent: true,
+      },
+      {
         source: "/profile",
         destination: "/archives",
+        permanent: true,
+      },
+      {
+        source: "/archive",
+        destination: "/archives",
+        permanent: true,
+      },
+      {
+        source: "/admin/project",
+        destination: "/admin/projects",
+        permanent: true,
+      },
+      {
+        source: "/admin/project/:id",
+        destination: "/admin/projects/:id",
+        permanent: true,
+      },
+      {
+        source: "/admin/article",
+        destination: "/admin/articles",
+        permanent: true,
+      },
+      {
+        source: "/admin/article/:id",
+        destination: "/admin/articles/:id",
+        permanent: true,
+      },
+      {
+        source: "/admin/post",
+        destination: "/admin/posts",
+        permanent: true,
+      },
+      {
+        source: "/admin/post/:id",
+        destination: "/admin/posts/:id",
+        permanent: true,
+      },
+      {
+        source: "/admin/moment",
+        destination: "/admin/posts",
+        permanent: true,
+      },
+      {
+        source: "/admin/moment/:id",
+        destination: "/admin/posts",
+        permanent: true,
+      },
+      {
+        source: "/admin/moments/:id",
+        destination: "/admin/posts",
         permanent: true,
       },
     ];

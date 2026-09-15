@@ -5,11 +5,12 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Play, Pause, Music2, Link as LinkIcon, FileText } from "lucide-react";
 import type { Post, PostMusic, PostImage } from "@/lib/mock-data";
-import { getImageSrc } from "@/lib/post-image";
+import { getImageSrc, resolveCoverImage } from "@/lib/post-image";
 import { toAbsoluteUrl, toHttps } from "@/lib/upload";
 import { renderContent } from "@/lib/sanitize";
 import { useMusicPlayer } from "@/lib/music-player-store";
 import { useSiteSettings } from "@/lib/site-settings-store";
+import { stripMarkdownAndHtml } from "@/lib/frontmatter";
 
 type TileKind = "image" | "video" | "music" | "link" | "text" | "article";
 
@@ -25,9 +26,9 @@ function resolveCover(url: string | undefined | null): string {
 function buildCover(post: Post, defaultCover: string): { kind: TileKind; cover: string; text: string } {
   const contentText = (post.content || "").replace(/<[^>]*>/g, "").trim();
 
-  // 文章类型优先：用 cover 字段作为缩略图，无封面时回退到站点默认封面（与首页 PostCard 一致）
-  if (post.type === "article") {
-    return { kind: "article", cover: resolveCover(post.cover || defaultCover), text: post.title || contentText };
+  // 文章与项目类型优先：用 cover 字段作为缩略图，无封面时回退到正文首图或站点默认封面
+  if (post.type === "article" || post.category === "项目" || post.type === "project") {
+    return { kind: "article", cover: resolveCoverImage(post.cover, post.content, defaultCover), text: post.title || contentText };
   }
 
   if (post.images && post.images.length > 0) {
@@ -97,9 +98,11 @@ function FadeThumb({ src, alt }: { src: string; alt: string }) {
  * 归档页图片缩略图 — 微信式正方形拼图 mosaic
  * 1=满，2=2列，3=3列，4=2x2，5=3x2(1空)，6=英雄布局(大2x2+5小)，7/8=3x3(留空)，9=3x3满
  */
-function ArchiveImageMosaic({ images }: { images: PostImage[] }) {
-  const count = Math.min(images.length, 9);
-  const visible = images.slice(0, 9);
+function ArchiveImageMosaic({ images }: { images?: PostImage[] }) {
+  const imgList = Array.isArray(images) ? images : [];
+  if (imgList.length === 0) return null;
+  const count = Math.min(imgList.length, 9);
+  const visible = imgList.slice(0, 9);
 
   let gridClass: string;
   let hero = false;
@@ -165,13 +168,16 @@ export default function ProfilePostCard({ post }: ProfilePostCardProps) {
   const defaultCover = useSiteSettings((s) => s.defaultCover);
   const { kind, cover, text } = buildCover(post, defaultCover);
 
-  // 文章类型跳转到文章详情页，动态跳转到动态详情页
-  const goDetail = () =>
-    router.push(
-      post.type === "article"
-        ? `/articles/${post.shortId || post.id}`
-        : `/moments/${post.shortId || post.id}`
-    );
+  // 项目跳转到项目详情页，文章跳转到文章详情页，动态跳转到动态详情页
+  const goDetail = () => {
+    if (post.category === "项目" || post.type === "project") {
+      router.push(`/projects/${post.shortId || post.id}`);
+    } else if (post.type === "article") {
+      router.push(`/articles/${post.shortId || post.id}`);
+    } else {
+      router.push(`/moments/${post.shortId || post.id}`);
+    }
+  };
 
   // 文章类型：链接卡片样式（左封面 + 右标题/摘要），与首页 PostCard 一致
   if (kind === "article") {
@@ -187,7 +193,7 @@ export default function ProfilePostCard({ post }: ProfilePostCardProps) {
       >
         <div className="max-w-[320px] rounded-md bg-wechat-bubble px-2.5 py-1.5 transition-opacity active:opacity-80 dark:bg-wechat-bubble">
           <div
-            className="rich-content text-[14px] leading-[20px] text-wechat-text"
+            className="rich-content line-clamp-3 text-[14px] leading-[20px] text-wechat-text"
             dangerouslySetInnerHTML={{ __html: renderContent(post.content || text) }}
           />
         </div>
@@ -285,7 +291,7 @@ function ProfileMusicCard({ post, cover, goDetail }: { post: Post; cover: string
         {/* 文本内容（如有）显示在灰色卡片内部上方 */}
         {hasContent && (
           <div
-            className="rich-content mb-2 text-[14px] leading-[20px] text-wechat-text"
+            className="rich-content mb-2 line-clamp-3 text-[14px] leading-[20px] text-wechat-text"
             dangerouslySetInnerHTML={{ __html: renderContent(post.content) }}
           />
         )}
@@ -374,7 +380,7 @@ function ProfileLinkCard({ post, cover, goDetail }: { post: Post; cover: string;
     >
       <div className="max-w-[280px] rounded-md bg-wechat-bubble px-2.5 py-2 transition-opacity active:opacity-80 dark:bg-wechat-bubble">
         <div
-          className="rich-content mb-2 text-[14px] leading-[20px] text-wechat-text"
+          className="rich-content mb-2 line-clamp-3 text-[14px] leading-[20px] text-wechat-text"
           dangerouslySetInnerHTML={{ __html: renderContent(post.content) }}
         />
         <div className="flex w-full items-center gap-2.5 transition-opacity active:opacity-80">
@@ -408,13 +414,15 @@ function ProfileLinkCard({ post, cover, goDetail }: { post: Post; cover: string;
  * 点击整卡跳转文章详情页
  */
 function ProfileArticleCard({ post, cover, goDetail }: { post: Post; cover: string; goDetail: () => void }) {
-  // excerpt 为空时从 content 提取纯文本作为摘要 fallback
-  const excerpt =
-    post.excerpt ||
-    (post.content || "")
-      .replace(/<[^>]*>/g, "")
-      .replace(/&nbsp;/g, " ")
-      .trim();
+  // excerpt 为空时从 content 提取纯文本作为摘要 fallback（剔除 frontmatter、HTML 与 Markdown）
+  let plainText = post.content ? stripMarkdownAndHtml(post.content) : "";
+  if (post.title && plainText.startsWith(post.title.trim())) {
+    plainText = plainText.slice(post.title.trim().length).trim();
+  }
+  const rawExcerpt = post.excerpt?.trim();
+  const cleanExcerpt = rawExcerpt ? stripMarkdownAndHtml(rawExcerpt) : "";
+  const isJunkExcerpt = !cleanExcerpt || /^---\s*(?:title|category|tags|articleType):/i.test(rawExcerpt || "");
+  const excerpt = (!isJunkExcerpt && cleanExcerpt !== post.title?.trim() ? cleanExcerpt : "") || plainText.slice(0, 120);
   return (
     <article
       onClick={goDetail}

@@ -8,30 +8,40 @@ export interface CurrentUser {
   token?: string;
 }
 
+let cachedUser: CurrentUser | null = null;
+let lastSignature = "";
+
 /**
  * 获取当前用户身份。
  * 优先返回已登录的博主，其次返回填写过信息的游客，都没有则返回 null。
+ * 结果被签名缓存以支持 useSyncExternalStore 引用稳定性。
  */
 export function getCurrentUser(): CurrentUser | null {
   if (typeof window === "undefined") return null;
 
-  // 1. 优先检查登录博主
-  const token = localStorage.getItem("admin_token");
-  const nickname = localStorage.getItem("admin_nickname");
+  // 1. 读取键值生成快照签名
+  const token = localStorage.getItem("admin_token") || "";
+  const nickname = localStorage.getItem("admin_nickname") || "";
   const email = localStorage.getItem("admin_email") || "";
-  if (token && nickname) {
-    return { isLoggedIn: true, nickname, email, website: "", token };
-  }
-
-  // 2. 其次检查游客信息
-  const vName = localStorage.getItem("visitor_name");
-  const vEmail = localStorage.getItem("visitor_email");
+  const vName = localStorage.getItem("visitor_name") || "";
+  const vEmail = localStorage.getItem("visitor_email") || "";
   const vWebsite = localStorage.getItem("visitor_website") || "";
-  if (vName && vEmail) {
-    return { isLoggedIn: false, nickname: vName, email: vEmail, website: vWebsite };
+
+  const signature = `${token}|${nickname}|${email}|${vName}|${vEmail}|${vWebsite}`;
+  if (signature === lastSignature) {
+    return cachedUser;
+  }
+  lastSignature = signature;
+
+  if (token && nickname) {
+    cachedUser = { isLoggedIn: true, nickname, email, website: "", token };
+  } else if (vName && vEmail) {
+    cachedUser = { isLoggedIn: false, nickname: vName, email: vEmail, website: vWebsite };
+  } else {
+    cachedUser = null;
   }
 
-  return null;
+  return cachedUser;
 }
 
 /**

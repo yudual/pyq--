@@ -7,6 +7,7 @@ import {
   plainTextToHtml,
   looksLikeHtml,
 } from "@/lib/sanitize";
+import { isMarkdown, markdownToHtml, enhanceCodeBlocks, copyToClipboard, injectLegacyHeadingIds } from "@/lib/markdown";
 import { replaceEmojiShortcodes, normalizeInlineEmoji } from "@/lib/emoji";
 import type { PostMusic, PostVideo, PostDouban, PostImage } from "@/lib/mock-data";
 import { toAbsoluteUrl } from "@/lib/upload";
@@ -21,6 +22,7 @@ interface ArticleEmbedContentProps {
   content: string;
   postId: string;
   className?: string;
+  title?: string;
 }
 
 interface HtmlSegment {
@@ -53,56 +55,26 @@ function decodePayload(str: string): PostMusic | PostVideo | PostDouban | Articl
   }
 }
 
-function renderHtmlSegment(html: string): string {
+function renderHtmlSegment(html: string, options?: { stripRedundantTitle?: string }): string {
   if (!html) return "";
-  const processed = looksLikeHtml(html) ? sanitizeHtml(html) : plainTextToHtml(html);
-  const withEmoji = normalizeInlineEmoji(replaceEmojiShortcodes(processed));
+  let processed = html;
+
+  // 判断是否是旧版 Tiptap 生成的完全 HTML 结构
+  const trimmed = html.trim();
+  const isLegacyFullHtml = /^<(?:p|h[1-6]|div class=|table|ul|ol)[\s>]/i.test(trimmed) && !isMarkdown(html);
+
+  if (!isLegacyFullHtml) {
+    // 现代 Markdown 引擎解析（含 GFM、Frontmatter 剥离、macOS 代码块与 Callout）
+    processed = markdownToHtml(html, options);
+  } else if (!looksLikeHtml(html)) {
+    processed = plainTextToHtml(html);
+  } else {
+    processed = injectLegacyHeadingIds(html);
+  }
+
+  const sanitized = sanitizeHtml(processed);
+  const withEmoji = normalizeInlineEmoji(replaceEmojiShortcodes(sanitized));
   return enhanceCodeBlocks(withEmoji);
-}
-
-/**
- * 将 HTML 中的 <pre><code> 代码块增强为 macOS 风格结构
- * （红黄绿圆点 + 语言标签 + 复制按钮 + 行号）。
- *
- * 使用正则替换而非 DOMParser，确保 SSR 和客户端产出完全一致，
- * 避免 hydration mismatch 导致 React 丢弃增强后的 HTML。
- */
-function enhanceCodeBlocks(html: string): string {
-  if (!html) return "";
-  if (html.indexOf("<pre") === -1) return html;
-
-  return html.replace(
-    /<pre([^>]*)>([\s\S]*?)<\/pre>/gi,
-    (_match, preAttrs: string, inner: string) => {
-      // 从 data-language 属性或 code class 中提取语言
-      const dataLangMatch = (preAttrs || "").match(/data-language="([^"]*)"/i);
-      const codeClassMatch = inner.match(/<code[^>]*class="[^"]*language-(\w+)[^"]*"/i);
-      const lang = (dataLangMatch?.[1] || codeClassMatch?.[1] || "plaintext").trim();
-      const langLabel = lang === "plaintext" ? "Text" : lang.charAt(0).toUpperCase() + lang.slice(1);
-
-      // 提取纯文本用于行号计算
-      const codeMatch = inner.match(/<code[^>]*>([\s\S]*?)<\/code>/i);
-      const codeInner = codeMatch?.[1] || inner;
-      const codeText = codeInner.replace(/<[^>]*>/g, "");
-      const lineCount = codeText.split("\n").length;
-      // 最后一行如果以 \n 结尾，split 会产生空字符串，减去
-      const actualLines = codeText.endsWith("\n") ? lineCount - 1 : lineCount;
-      const lineNumbers = Array.from(
-        { length: Math.max(1, actualLines) },
-        (_, i) => i + 1
-      ).join("\n");
-
-      // 合并 class 到 <pre>
-      const existingClassMatch = (preAttrs || "").match(/class="([^"]*)"/i);
-      const mergedClass = existingClassMatch
-        ? `${existingClassMatch[1]} macos-enhanced-code`
-        : "macos-enhanced-code";
-      const cleanedAttrs = (preAttrs || "").replace(/\s*class="[^"]*"/gi, "");
-      const preTag = `<pre class="${mergedClass}"${cleanedAttrs}>${inner}</pre>`;
-
-      return `<div class="macos-enhanced-pre"><div class="macos-enhanced-header"><div class="macos-traffic-lights"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><span class="macos-enhanced-lang">${langLabel}</span><button class="macos-enhanced-copy" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>复制</span></button></div><div class="macos-enhanced-body"><div class="macos-line-numbers">${lineNumbers}</div>${preTag}</div></div>`;
-    }
-  );
 }
 
 // 匹配带有 data-embed 属性的 div 开标签（属性顺序不限）
@@ -136,30 +108,29 @@ function splitContent(content: string): Segment[] {
       segments.push({ kind: "html", html: content.slice(lastIndex, match.index) });
     }
 
-    const payload = decodePayload(payloadStr);
+    const payload = payloadStr ? decodePayload(payloadStr) : null;
     if (payload) {
       if (embedType === "music") {
         segments.push({ kind: "music", payload: payload as PostMusic });
       } else if (embedType === "video") {
         segments.push({ kind: "video", payload: payload as PostVideo });
+      } else if (embedType === "douban") {
+        segments.push({ kind: "douban", payload: payload as PostDouban });
       } else if (embedType === "article") {
         segments.push({ kind: "article", payload: payload as ArticleEmbedData });
-      } else {
-        segments.push({ kind: "douban", payload: payload as PostDouban });
       }
-    } else {
-      // 解码失败：保留原始 HTML 作为兜底
-      segments.push({ kind: "html", html: content.slice(match.index, fullMatchEnd) });
     }
+
     lastIndex = fullMatchEnd;
   }
+
   if (lastIndex < content.length) {
     segments.push({ kind: "html", html: content.slice(lastIndex) });
   }
+
   return segments;
 }
 
-/** 判断图片是否为内联表情（不应预览） */
 function isInlineEmoji(img: HTMLImageElement): boolean {
   if (img.classList.contains("inline-emoji")) return true;
   const src = img.getAttribute("src") || "";
@@ -183,6 +154,7 @@ export default function ArticleEmbedContent({
   content,
   postId,
   className,
+  title,
 }: ArticleEmbedContentProps) {
   const segments = useMemo(() => splitContent(content), [content]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -197,7 +169,7 @@ export default function ArticleEmbedContent({
 
   /**
    * 事件委托：容器上的 click 事件。
-   * - 代码块复制按钮：点击 .macos-enhanced-copy 复制对应代码
+   * - 代码块复制按钮：点击 .macos-enhanced-copy 复制对应代码（安全降级支持非 HTTPS）
    * - 图片预览：点击 img 收集所有可预览图片并打开 ImageViewer
    */
   const handleContainerClick = useCallback(
@@ -213,8 +185,9 @@ export default function ArticleEmbedContent({
         if (!wrapper) return;
         const code = wrapper.querySelector("code");
         if (!code) return;
-        const codeText = code.textContent || "";
-        navigator.clipboard.writeText(codeText).then(() => {
+        const codeText = wrapper.getAttribute("data-code") || code.textContent || "";
+        copyToClipboard(codeText).then((success) => {
+          if (!success) return;
           const label = copyBtn.querySelector("span");
           if (label) {
             const originalText = label.textContent;
@@ -293,7 +266,9 @@ export default function ArticleEmbedContent({
           <div
             key={i}
             className="article-html-segment"
-            dangerouslySetInnerHTML={{ __html: renderHtmlSegment(seg.html) }}
+            dangerouslySetInnerHTML={{
+              __html: renderHtmlSegment(seg.html, { stripRedundantTitle: title }),
+            }}
           />
         );
       })}

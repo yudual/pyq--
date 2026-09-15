@@ -6,6 +6,7 @@ import { User, Post, Comment, Like, SiteSetting } from "../models";
 import { authenticate, requireAdmin, AuthRequest } from "../middleware/auth";
 import { blacklistService } from "../services/blacklist-service";
 import { siteSettingTextDefaults } from "../models/SiteSetting";
+import { stripMarkdownAndFrontmatter } from "./posts";
 
 const router = Router();
 
@@ -14,8 +15,8 @@ const router = Router();
 router.get("/dashboard", authenticate, requireAdmin, async (_req: AuthRequest, res: Response) => {
   const [users, moments, articles, comments, likes] = await Promise.all([
     User.count(),
-    Post.count({ where: { isAd: false, type: "moment" } }),
-    Post.count({ where: { isAd: false, type: "article" } }),
+    Post.count({ where: { type: "moment" } }),
+    Post.count({ where: { type: "article" } }),
     Comment.count(),
     Like.count(),
   ]);
@@ -25,8 +26,8 @@ router.get("/dashboard", authenticate, requireAdmin, async (_req: AuthRequest, r
   const [timeSeriesRows] = await sequelize.query(`
     SELECT
       d.date,
-      (SELECT COUNT(*) FROM posts    WHERE DATE(created_at) = d.date AND is_ad = 0 AND type = 'moment')  AS moments,
-      (SELECT COUNT(*) FROM posts    WHERE DATE(created_at) = d.date AND is_ad = 0 AND type = 'article') AS articles,
+      (SELECT COUNT(*) FROM posts    WHERE DATE(created_at) = d.date AND type = 'moment')  AS moments,
+      (SELECT COUNT(*) FROM posts    WHERE DATE(created_at) = d.date AND type = 'article') AS articles,
       (SELECT COUNT(*) FROM comments WHERE DATE(created_at) = d.date)              AS comments,
       (SELECT COUNT(*) FROM likes    WHERE DATE(created_at) = d.date)              AS likes
     FROM (
@@ -51,7 +52,6 @@ router.get("/dashboard", authenticate, requireAdmin, async (_req: AuthRequest, r
 
   // 最近 5 条动态（含作者昵称、内容前 100 字、是否置顶）
   const recentPostRows = await Post.findAll({
-    where: { isAd: false },
     include: [{ model: User, as: "author", attributes: ["nickname"] }],
     order: [["createdAt", "DESC"]],
     limit: 5,
@@ -65,7 +65,6 @@ router.get("/dashboard", authenticate, requireAdmin, async (_req: AuthRequest, r
   }));
 
   // 最近 5 条评论（含所属动态作者和内容前 50 字）
-  // 不按 isAd 过滤：评论无论在普通动态还是广告动态上都算评论，都应展示
   const recentCommentRows = await Comment.findAll({
     include: [{
       model: Post,
@@ -99,7 +98,7 @@ router.get("/users", authenticate, requireAdmin, async (_req: AuthRequest, res: 
 });
 
 // GET /api/admin/posts - 管理端文章/动态列表（支持 type 过滤、分页）
-// type=article → 仅文章；type=moment → 仅动态；不传 → 全部（含广告）
+// type=article → 仅文章；type=moment → 仅动态；不传 → 全部
 router.get("/posts", authenticate, requireAdmin, async (req: AuthRequest, res: Response) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
@@ -113,6 +112,10 @@ router.get("/posts", authenticate, requireAdmin, async (req: AuthRequest, res: R
   const categoryParam = req.query.category as string;
   if (categoryParam) {
     where.category = categoryParam;
+  }
+  const statusParam = req.query.status as string;
+  if (statusParam && (statusParam === "published" || statusParam === "draft")) {
+    where.status = statusParam;
   }
 
   const { count, rows: posts } = await Post.findAndCountAll({
@@ -130,14 +133,15 @@ router.get("/posts", authenticate, requireAdmin, async (req: AuthRequest, res: R
       shortId: p.shortId,
       type: p.type || "moment",
       title: p.title || "",
-      excerpt: p.excerpt || "",
+      excerpt: p.excerpt ? stripMarkdownAndFrontmatter(p.excerpt) : "",
       cover: p.cover || "",
       category: p.category || "",
-      content: (p.content || "").replace(/<[^>]+>/g, "").slice(0, 200),
+      content: stripMarkdownAndFrontmatter(p.content || "").slice(0, 200),
       articleType: p.articleType || "original",
       repostUrl: p.repostUrl || "",
+      linkCard: p.linkCard || null,
+      images: p.images || [],
       pinned: !!p.pinned,
-      isAd: !!p.isAd,
       status: p.status || "published",
       createdAt: p.createdAt,
       author: p.author?.nickname || "",

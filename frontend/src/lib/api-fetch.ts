@@ -34,18 +34,16 @@ export function clearAuth() {
 
 export async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
   const token = getToken();
+  const headers = new Headers(options?.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
   const res = await fetch(`${getApiUrl()}${path}`, {
     ...options,
-    headers: {
-      ...(options?.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    credentials: options?.credentials ?? "include",
+    headers,
   });
   if (res.status === 401) {
     clearAuth();
-    if (typeof window !== "undefined") {
-      window.location.href = "/";
-    }
     throw new Error("Unauthorized");
   }
   return res;

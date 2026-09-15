@@ -1,8 +1,5 @@
-import type { Metadata } from "next";
-import AdminMusic from "./AdminMusic";
-
-export const metadata: Metadata = { title: "管理后台 - R2 音乐歌单" };
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <AdminMusic />;
+  redirect("/admin/settings");
 }

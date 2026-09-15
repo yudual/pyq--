@@ -74,9 +74,6 @@ interface PostAttributes {
   video: PostVideo | null;
   douban: PostDouban | null;
   pinned: boolean;
-  isAd: boolean;
-  adAvatar: string;
-  adNickname: string;
   likesDisabled: boolean;
   commentsDisabled: boolean;
   /** 发帖者 IP（用于解析省份） */
@@ -93,7 +90,7 @@ interface PostAttributes {
   status: "published" | "draft";
 }
 
-interface PostCreationAttributes extends Optional<PostAttributes, "id" | "shortId" | "type" | "title" | "excerpt" | "cover" | "category" | "pinned" | "isAd" | "adAvatar" | "adNickname" | "likesDisabled" | "commentsDisabled" | "ip" | "region" | "articleType" | "repostUrl" | "viewCount" | "status"> {}
+interface PostCreationAttributes extends Optional<PostAttributes, "id" | "shortId" | "type" | "title" | "excerpt" | "cover" | "category" | "pinned" | "likesDisabled" | "commentsDisabled" | "ip" | "region" | "articleType" | "repostUrl" | "viewCount" | "status"> {}
 
 class Post
   extends Model<PostAttributes, PostCreationAttributes>
@@ -115,9 +112,6 @@ class Post
   declare video: PostVideo | null;
   declare douban: PostDouban | null;
   declare pinned: boolean;
-  declare isAd: boolean;
-  declare adAvatar: string;
-  declare adNickname: string;
   declare likesDisabled: boolean;
   declare commentsDisabled: boolean;
   declare ip: string;
@@ -215,21 +209,6 @@ Post.init(
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
-    },
-    isAd: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false,
-    },
-    adAvatar: {
-      type: DataTypes.STRING(512),
-      allowNull: false,
-      defaultValue: "",
-    },
-    adNickname: {
-      type: DataTypes.STRING(100),
-      allowNull: false,
-      defaultValue: "",
     },
     likesDisabled: {
       type: DataTypes.BOOLEAN,

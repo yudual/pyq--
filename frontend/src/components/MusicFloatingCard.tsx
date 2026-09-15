@@ -8,7 +8,9 @@ import { getGlobalAudio } from "@/lib/global-audio";
 import { toHttps, toAbsoluteUrl } from "@/lib/upload";
 import LazyImage from "./LazyImage";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { PUBLIC_API_URL } from "@/lib/api-fetch";
+
+const API_URL = PUBLIC_API_URL;
 
 function resolveCover(cover: string): string {
   if (!cover) return "";

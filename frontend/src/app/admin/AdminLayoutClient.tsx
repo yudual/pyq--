@@ -1,16 +1,15 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, FileText, BookText, User, LogOut, MessageCircle, PenLine, Settings2, BookUser, Music, Megaphone, PanelLeftClose, ChevronDown, Home, Images, Cloud, ShieldBan, Film, Menu, Info, MonitorSmartphone, FlaskConical } from "lucide-react";
+import { LayoutDashboard, FileText, BookText, User, LogOut, MessageCircle, PenLine, Settings2, BookUser, PanelLeftClose, ChevronDown, Home, Images, Menu, Info, Code2, HardDrive } from "lucide-react";
 import Image from "next/image";
 import EditPostModal from "@/components/EditPostModal";
 import ThemeToggleButton from "@/components/admin/ThemeToggleButton";
-import AdminMusicPlayer from "@/components/admin/AdminMusicPlayer";
 import { useExitAnimation } from "@/lib/use-exit-animation";
 import { useSiteSettings } from "@/lib/site-settings-store";
-import { useMusicPlayer } from "@/lib/music-player-store";
 import { toAbsoluteUrl } from "@/lib/upload";
 
 export default function AdminLayoutClient({
@@ -28,36 +27,39 @@ export default function AdminLayoutClient({
   const siteName = useSiteSettings((s) => s.siteName);
   const faviconUrl = useSiteSettings((s) => s.faviconUrl);
   const fetchSettings = useSiteSettings((s) => s.fetchSettings);
-  const activePostMusic = useMusicPlayer((s) => s.activePostMusic);
-  const bgMusic = useMusicPlayer((s) => s.bgMusic);
-  const playlist = useMusicPlayer((s) => s.playlist);
-  const musicUrl = useMusicPlayer((s) => s.musicUrl);
-  const hasMusic = !!(activePostMusic || bgMusic || musicUrl || playlist.length);
 
   useEffect(() => {
+    if (pathname === "/admin/login") {
+      setLoading(false);
+      return;
+    }
     const token = localStorage.getItem("admin_token");
     if (!token) {
-      router.replace("/");
+      router.replace("/admin/login");
+      return;
     }
     setLoading(false);
-    if (token) fetchSettings();
-  }, [router, fetchSettings]);
+    fetchSettings();
+  }, [router, fetchSettings, pathname]);
 
   // 侧栏收缩状态持久化
   useEffect(() => {
+    if (pathname === "/admin/login") return;
     const saved = localStorage.getItem("admin_sidebar_collapsed");
     if (saved === "true") setCollapsed(true);
     const savedGroups = localStorage.getItem("admin_sidebar_groups");
     if (savedGroups) {
       try { setCollapsedGroups(JSON.parse(savedGroups)); } catch { /* ignore */ }
     }
-  }, []);
+  }, [pathname]);
   useEffect(() => {
+    if (pathname === "/admin/login") return;
     localStorage.setItem("admin_sidebar_collapsed", String(collapsed));
-  }, [collapsed]);
+  }, [collapsed, pathname]);
   useEffect(() => {
+    if (pathname === "/admin/login") return;
     localStorage.setItem("admin_sidebar_groups", JSON.stringify(collapsedGroups));
-  }, [collapsedGroups]);
+  }, [collapsedGroups, pathname]);
 
   const toggleGroup = (label: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -68,6 +70,11 @@ export default function AdminLayoutClient({
     if (mobileNavOpen) mobileNav.handleClose();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  // 如果是登录页面，在所有 Hook 执行完后直接渲染登录组件，不显示管理后台侧边栏
+  if (pathname === "/admin/login") {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (
@@ -80,40 +87,30 @@ export default function AdminLayoutClient({
     );
   }
 
-  // 分组导航：仪表盘独立 + 内容管理组 + 设置组
+  // 精炼对标前台频道的后台导航菜单
   const navGroups = [
     {
       label: null as string | null,
       items: [{ href: "/admin", label: "仪表盘", icon: LayoutDashboard }],
     },
     {
-      label: "内容管理",
+      label: "前台频道管理",
       items: [
-        { href: "/admin/posts", label: "动态管理", icon: FileText },
         { href: "/admin/articles", label: "文章管理", icon: BookText },
-        { href: "/admin/ads", label: "广告管理", icon: Megaphone },
-        { href: "/admin/comments", label: "评论管理", icon: MessageCircle },
-        { href: "/admin/blacklist", label: "黑名单", icon: ShieldBan },
-        { href: "/admin/media", label: "媒体库", icon: Images },
-        { href: "/admin/douban", label: "豆瓣书影", icon: Film },
+        { href: "/admin/posts", label: "岁岁念与动态", icon: FileText },
+        { href: "/admin/projects", label: "项目管理", icon: Code2 },
+        { href: "/admin/about", label: "关于页自述", icon: Info },
+        { href: "/admin/media", label: "媒体素材库", icon: Images },
       ],
     },
     {
-      label: "其他功能",
+      label: "互动与站点设置",
       items: [
-        { href: "/admin/about", label: "关于", icon: Info },
-        { href: "/admin/equipment", label: "装备", icon: MonitorSmartphone },
-        { href: "/admin/labs", label: "Labs", icon: FlaskConical },
-      ],
-    },
-    {
-      label: "设置",
-      items: [
-        { href: "/admin/users", label: "个人资料", icon: User },
+        { href: "/admin/comments", label: "评论留言", icon: MessageCircle },
+        { href: "/admin/users", label: "个人资料 (Hero出场)", icon: User },
         { href: "/admin/friends", label: "友情链接", icon: BookUser },
-        { href: "/admin/music", label: "R2 音乐歌单", icon: Music },
-        { href: "/admin/storage", label: "云端存储", icon: Cloud },
-        { href: "/admin/settings", label: "网站设置", icon: Settings2 },
+        { href: "/admin/settings", label: "网站全局设置", icon: Settings2 },
+        { href: "/admin/storage", label: "存储与图床设置", icon: HardDrive },
       ],
     },
   ];
@@ -217,16 +214,12 @@ export default function AdminLayoutClient({
             <PanelLeftClose className={`h-5 w-5 transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
           </button>
           <h1 className="shrink-0 text-sm font-semibold text-adm-text">{currentPageTitle}</h1>
-          {hasMusic && (
-            <div className="ml-2 flex min-w-0 items-center gap-2 rounded-lg bg-adm-input/60 px-2.5 py-1">
-              <AdminMusicPlayer />
-            </div>
-          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Link
             href="/"
             target="_blank"
+            rel="noopener noreferrer"
             className="flex h-9 w-9 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text"
             title="前往首页"
           >
@@ -268,16 +261,13 @@ export default function AdminLayoutClient({
                 <PenLine className="h-4 w-4 text-adm-primary-text" />
               )}
             </div>
-            {hasMusic ? (
-              <AdminMusicPlayer />
-            ) : (
-              <span className="truncate text-sm font-semibold text-adm-text">{currentPageTitle}</span>
-            )}
+            <span className="truncate text-sm font-semibold text-adm-text">{currentPageTitle}</span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <Link
               href="/"
               target="_blank"
+              rel="noopener noreferrer"
               className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
               title="前往首页"
             >

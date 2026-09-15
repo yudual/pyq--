@@ -246,6 +246,19 @@ router.post("/confirm", authenticate, requireAdmin, async (req: AuthRequest, res
   }
 });
 
+// GET /api/media/storage-status — 获取存储就绪状态（仅管理员）
+router.get("/storage-status", authenticate, requireAdmin, async (_req: AuthRequest, res: Response) => {
+  const ready = isR2Ready();
+  const bucket = process.env.R2_BUCKET || "";
+  const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  res.json({
+    r2Configured: ready,
+    bucket: ready ? bucket : "",
+    publicUrl: ready ? publicUrl : "",
+    storageMode: ready ? "r2" : "external",
+  });
+});
+
 // GET /api/media/:id/text — 读取本人上传的小型歌词文件，不代理音频。
 router.get(
   "/:id/text",

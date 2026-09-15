@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PostCardSkeleton } from "@/components/Skeleton";
-import { useSiteSettings } from "@/lib/site-settings-store";
 import { groupByTime } from "@/lib/time-group";
 import { authFetchHeaders } from "@/lib/auth";
 import type { Post } from "@/lib/mock-data";
@@ -29,6 +28,7 @@ interface ProfileTimelineProps {
   initialPosts: Post[];
   initialHasMore: boolean;
   initialPage: number;
+  initialError?: boolean;
   ownerId: string;
 }
 
@@ -36,32 +36,52 @@ export default function ProfileTimeline({
   initialPosts,
   initialHasMore,
   initialPage,
+  initialError = false,
   ownerId,
 }: ProfileTimelineProps) {
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [page, setPage] = useState(initialPage);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState(false);
-  const [ads, setAds] = useState<Post[]>([]);
+  const [error, setError] = useState(initialError);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
-  const fetchSettings = useSiteSettings((s) => s.fetchSettings);
-  const adOnArchives = useSiteSettings((s) => s.adOnArchives);
-  const settingsLoaded = useSiteSettings((s) => s.loaded);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+  const buildFirstPageUrl = useCallback(
+    (email: string) => {
+      const emailQ = email ? `&email=${encodeURIComponent(email)}` : "";
+      return `${API_URL}/posts?userId=${ownerId}&page=1&limit=${PAGE_SIZE}${emailQ}`;
+    },
+    [ownerId]
+  );
+
+  const retryFirstPage = useCallback(async () => {
+    setError(false);
+    try {
+      const email = (typeof window !== "undefined" && localStorage.getItem("visitor_email")) || "";
+      const res = await fetch(buildFirstPageUrl(email), {
+        cache: "no-store",
+        credentials: "include",
+        headers: authFetchHeaders(),
+      });
+      if (!res.ok) throw new Error("fetch failed");
+      const json = await res.json();
+      if (!Array.isArray(json?.data)) throw new Error("invalid response");
+      setPosts(json.data);
+      setPage(1);
+      setHasMore(json.pagination?.hasMore ?? false);
+    } catch {
+      setError(true);
+    }
+  }, [buildFirstPageUrl]);
 
   // 客户端首次加载：用真实 IP/email/cookie/token 获取 meLiked 状态，覆盖 SSR 数据
   // 关键：登录用户必须带 Authorization header，否则后端走 cookie visitorId 维度
   // 但该维度点赞已被 migrateLikesToUserId 升级，导致 meLiked 错误
   useEffect(() => {
     const email = (typeof window !== "undefined" && localStorage.getItem("visitor_email")) || "";
-    const url = `${API_URL}/posts?userId=${ownerId}&page=1&limit=${PAGE_SIZE}${email ? `&email=${encodeURIComponent(email)}` : ""}`;
-    fetch(url, {
+    fetch(buildFirstPageUrl(email), {
       cache: "no-store",
       credentials: "include",
       headers: authFetchHeaders(),
@@ -74,27 +94,11 @@ export default function ProfileTimeline({
         setHasMore(json.pagination?.hasMore ?? false);
         setError(false);
       })
-      .catch(() => {});
-  }, [ownerId]);
-
-  // 根据设置决定是否获取广告（拉取全部，前端随机选一条，类似微信朋友圈）
-  useEffect(() => {
-    if (!settingsLoaded || !adOnArchives) {
-      setAds([]);
-      return;
-    }
-    let cancelled = false;
-    fetch(`${API_URL}/ads`, { cache: "no-store", credentials: "include", headers: authFetchHeaders() })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (cancelled) return;
-        setAds(Array.isArray(json?.data) ? json.data : []);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [settingsLoaded, adOnArchives]);
+      .catch(() => {
+        // SSR 首屏数据为空且客户端补拉也失败时，展示错误态而非空白
+        if (initialPosts.length === 0) setError(true);
+      });
+  }, [ownerId, buildFirstPageUrl, initialPosts.length]);
 
   useEffect(() => {
     const handler = async () => {
@@ -173,25 +177,25 @@ export default function ProfileTimeline({
   const { pinnedPosts, groups } = useMemo(() => {
     const pinned = posts.filter((p) => p.pinned);
     const baseTimelinePosts = posts.filter((p) => !p.pinned);
-    // 广告插入到第 5 个位置，从广告池随机选一条，使用前一条动态的时间以便归入同一时间分组
-    const AD_POSITION = 4;
-    const ad = ads.length > 0 ? ads[Math.floor(Math.random() * ads.length)] : null;
-    const timelinePosts =
-      ad && baseTimelinePosts.length >= AD_POSITION
-        ? (() => {
-            const refPost = baseTimelinePosts[AD_POSITION - 1];
-            const adWithTime: Post = { ...ad, createdAt: refPost.createdAt };
-            return [
-              ...baseTimelinePosts.slice(0, AD_POSITION),
-              adWithTime,
-              ...baseTimelinePosts.slice(AD_POSITION),
-            ];
-          })()
-        : baseTimelinePosts;
-    return { pinnedPosts: pinned, groups: groupByTime(timelinePosts) };
-  }, [posts, ads]);
+    return { pinnedPosts: pinned, groups: groupByTime(baseTimelinePosts) };
+  }, [posts]);
 
   if (posts.length === 0) {
+    if (error) {
+      return (
+        <div className="py-12 text-center">
+          <p className="text-sm font-medium text-wechat-text">内容加载失败</p>
+          <p className="mt-1 text-xs text-wechat-time">请检查网络后重试</p>
+          <button
+            type="button"
+            onClick={retryFirstPage}
+            className="mt-4 rounded-lg bg-wechat-link px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-80"
+          >
+            重试
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="py-12 text-center text-sm text-wechat-time">暂无动态</div>
     );

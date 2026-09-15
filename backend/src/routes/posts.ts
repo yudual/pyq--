@@ -18,21 +18,87 @@ const router = Router();
 const AUTO_BAN_DURATION = 60 * 60 * 1000;
 
 /**
+ * 剥离文本中的 Frontmatter、HTML 标签与 Markdown 标记
+ */
+export function stripMarkdownAndFrontmatter(text: string): string {
+  if (!text) return "";
+  let clean = text.trim();
+  // 1. 剥离多行 YAML Frontmatter 块（支持开头的 BOM 与空白）
+  clean = clean.replace(/^\uFEFF?[\s]*---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, "");
+  // 2. 剥离单行或未闭合截断的 Frontmatter（如 --- title: ... --- 或 --- title: ...）
+  clean = clean.replace(/^---[ \t]*(?:title|category|tags|cover|excerpt|articleType|repostUrl|pinned|status|date):[\s\S]*?(?:---(?:\r?\n|\s)|$)/i, "");
+  // 3. 剥离 HTML 注释与代码块 (``` 与 ~~~)
+  clean = clean.replace(/<!--[\s\S]*?-->/g, "");
+  clean = clean.replace(/(?:```|~~~)[a-zA-Z0-9_-]*\r?\n[\s\S]*?(?:(?:```|~~~)|$)/g, "");
+  clean = clean.replace(/`([^`]+)`/g, "$1");
+  // 4. 剥离表格分割行与竖线
+  clean = clean.replace(/^\|?[\s-:]+\|[\s\-:|]+/gm, "");
+  clean = clean.replace(/\|/g, " ");
+  // 5. 剥离图片与链接语法
+  clean = clean.replace(/!\[([^\]]*)\]\([^)]+\)/g, "");
+  clean = clean.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  // 6. 剥离 Callout、引用、标题标记、列表符号等
+  clean = clean.replace(/^>\s*\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*/gim, "");
+  clean = clean.replace(/^>\s+/gm, "");
+  clean = clean.replace(/^#{1,6}\s+/gm, "");
+  clean = clean.replace(/^(\s*[-*+]\s+|\s*\d+\.\s+)/gm, "");
+  clean = clean.replace(/[*~_]{1,3}([^*~_\n]+)[*~_]{1,3}/g, "$1");
+  // 7. 剥离 HTML 标签与实体
+  clean = clean
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+  // 8. 规范化多余空白
+  clean = clean.replace(/\s+/g, " ").trim();
+  // 9. 兜底清理任何残存的 frontmatter 头部
+  if (/^---\s*(?:title|category|tags|articleType):/i.test(clean)) {
+    clean = clean.replace(/^---[\s\S]*?(?:---|$)/, "").trim();
+  }
+  return clean;
+}
+
+/**
  * 生成文章摘要：
- * - excerpt 非空且不等于标题时直接用
- * - 否则从 content 提取纯文本前 100 字符
+ * - 如果已有 excerpt 且非假 frontmatter 垃圾数据、不等于标题，清洗后直接使用
+ * - 否则从 content 剥离 Frontmatter 与 Markdown 语法后提取纯正文前 160 字符
  */
 function getExcerpt(post: any): string {
   const title = (post.title || "").trim();
-  const excerpt = (post.excerpt || "").trim();
-  if (excerpt && excerpt !== title) return excerpt;
+  let excerpt = (post.excerpt || "").trim();
+
+  // 如果已有 excerpt，先检测是否是意外存入的 frontmatter
+  if (excerpt) {
+    const isJunk = /^---\s*(?:title|category|tags|articleType):/i.test(excerpt);
+    if (!isJunk) {
+      const cleanExp = stripMarkdownAndFrontmatter(excerpt);
+      if (cleanExp && cleanExp !== title) return cleanExp;
+    }
+  }
+
+  // 从 content 提取纯净正文作为摘要
   const content = post.content || "";
-  const text = content
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return text.slice(0, 100);
+  let text = stripMarkdownAndFrontmatter(content);
+
+  // 如果正文开头重复了文章大标题（例如原文第一行是 # 文章标题），去除之以避免重复
+  if (title && text.startsWith(title)) {
+    text = text.slice(title.length).trim();
+  }
+
+  return text.slice(0, 160);
+}
+
+/**
+ * 获取文章/项目/动态的规范详情路径
+ */
+function getCanonicalPostPath(post: { shortId?: string | null; id: string; type?: string; category?: string }): string {
+  const slug = post.shortId || post.id;
+  if (post.category === "项目" || post.type === "project") return `/projects/${slug}`;
+  if (post.type === "article") return `/articles/${slug}`;
+  return `/moments/${slug}`;
 }
 
 /**
@@ -183,9 +249,6 @@ function formatPost(
       video: video || null,
       douban: douban || null,
       pinned: post.pinned || false,
-      isAd: post.isAd || false,
-      adAvatar: post.adAvatar || "",
-      adNickname: post.adNickname || "",
       likesDisabled: post.likesDisabled || false,
       commentsDisabled: post.commentsDisabled || false,
       createdAt: post.createdAt,
@@ -220,14 +283,26 @@ function formatPost(
     };
 }
 
-// GET /api/posts - list posts with pagination（排除广告，广告由 /api/ads 单独提供）
+// GET /api/posts - list posts with pagination
 // 支持 ?type=article/moment 过滤，?category=xxx 分类过滤
 router.get("/", authenticateOptional, async (req: AuthRequest, res: Response) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
   const offset = (page - 1) * limit;
 
-  const where: any = { isAd: false, status: "published" };
+  const where: any = {};
+  const isAdmin = req.user?.role === "admin";
+  const statusParam = req.query.status as string;
+
+  if (isAdmin && statusParam && (statusParam === "published" || statusParam === "draft")) {
+    where.status = statusParam;
+  } else if (isAdmin && req.query.all === "1") {
+    // 管理员请求全部状态
+  } else {
+    // 非管理员或公共查询，严格只查已发布内容，杜绝草稿泄漏
+    where.status = "published";
+  }
+
   const typeParam = req.query.type as string;
   if (typeParam === "article" || typeParam === "moment") {
     where.type = typeParam;
@@ -235,6 +310,9 @@ router.get("/", authenticateOptional, async (req: AuthRequest, res: Response) =>
   const categoryParam = req.query.category as string;
   if (categoryParam) {
     where.category = categoryParam;
+  } else if ((typeParam === "article" || typeParam === "moment") && req.query.includeProjects !== "1") {
+    // 纯文章与动态列表默认严格排除“项目”分类，确保与独立项目彻底分流
+    where.category = { [Op.ne]: "项目" };
   }
 
   const { count, rows: posts } = await Post.findAndCountAll({
@@ -323,7 +401,6 @@ router.get("/search", async (req: Request, res: Response) => {
 
   const posts = await Post.findAll({
     where: {
-      isAd: false,
       status: "published",
       [Op.or]: [
         { title: { [Op.like]: `%${q}%` } },
@@ -372,6 +449,13 @@ router.get("/:id", authenticateOptional, async (req: AuthRequest, res: Response)
 
   if (!post) {
     res.status(404).json({ message: "动态不存在" });
+    return;
+  }
+
+  // 草稿状态权限拦截：仅管理员或作者本人可查看草稿，外部访客一律 404
+  const isAdminOrAuthor = req.user?.role === "admin" || (req.user?.id && req.user.id === post.userId);
+  if (post.status === "draft" && !isAdminOrAuthor) {
+    res.status(404).json({ message: "内容不存在或尚未发布" });
     return;
   }
 
@@ -452,7 +536,6 @@ router.post(
     body("linkCard").optional({ nullable: true }).isObject(),
     body("video").optional({ nullable: true }).isObject(),
     body("douban").optional({ nullable: true }).isObject(),
-    body("isAd").optional().isBoolean(),
     body("likesDisabled").optional().isBoolean(),
     body("commentsDisabled").optional().isBoolean(),
     body("pinned").optional().isBoolean(),
@@ -481,7 +564,6 @@ router.post(
       linkCard = null,
       video = null,
       douban = null,
-      isAd = false,
       likesDisabled = false,
       commentsDisabled = false,
       pinned = false,
@@ -489,9 +571,6 @@ router.post(
     } = req.body;
 
     const normalizedMusic = await validateR2MusicPayload(music, req.user!.id);
-
-    // 广告不允许置顶，强制清零防止前端绕过
-    const finalPinned = isAd ? false : pinned;
 
     const ip = getClientIp(req);
     const ipRegion = await getRegionByIp(ip);
@@ -517,10 +596,9 @@ router.post(
           linkCard,
           video,
           douban,
-          isAd,
           likesDisabled,
           commentsDisabled,
-          pinned: finalPinned,
+          pinned,
           status,
           ip,
           region,
@@ -540,8 +618,8 @@ router.post(
       ],
     });
 
-    // 触发首页 ISR 重生成，确保刷新页面立即可见最新动态
-    triggerRevalidate();
+    // 触发首页与详情页 ISR 重生成，确保刷新页面立即可见最新动态
+    triggerRevalidate([getCanonicalPostPath(full || post!)]);
 
     res.status(201).json(formatPost(full));
   }
@@ -569,7 +647,6 @@ router.put(
     body("linkCard").optional({ nullable: true }).isObject(),
     body("video").optional({ nullable: true }).isObject(),
     body("douban").optional({ nullable: true }).isObject(),
-    body("isAd").optional().isBoolean(),
     body("likesDisabled").optional().isBoolean(),
     body("commentsDisabled").optional().isBoolean(),
     body("pinned").optional().isBoolean(),
@@ -592,13 +669,10 @@ router.put(
       ? await validateR2MusicPayload(req.body.music, req.user!.id)
       : post.music;
 
-    const finalIsAd = req.body.isAd !== undefined ? req.body.isAd : post.isAd;
     const incomingPinned = req.body.pinned;
-    const finalPinned = finalIsAd
-      ? false
-      : incomingPinned !== undefined
-        ? incomingPinned
-        : post.pinned;
+    const finalPinned = incomingPinned !== undefined ? incomingPinned : post.pinned;
+
+    const oldPath = getCanonicalPostPath(post);
 
     await post.update({
       type: req.body.type !== undefined ? req.body.type : post.type,
@@ -616,15 +690,15 @@ router.put(
       linkCard: req.body.linkCard !== undefined ? req.body.linkCard : post.linkCard,
       video: req.body.video !== undefined ? req.body.video : post.video,
       douban: req.body.douban !== undefined ? req.body.douban : post.douban,
-      isAd: finalIsAd,
       likesDisabled: req.body.likesDisabled !== undefined ? req.body.likesDisabled : post.likesDisabled,
       commentsDisabled: req.body.commentsDisabled !== undefined ? req.body.commentsDisabled : post.commentsDisabled,
       pinned: finalPinned,
       status: req.body.status !== undefined ? req.body.status : post.status,
     });
 
-    // 触发首页 ISR 重生成，确保刷新页面看到最新动态
-    triggerRevalidate();
+    const newPath = getCanonicalPostPath(post);
+    // 触发首页与详情页 ISR 重生成，确保刷新页面看到最新动态
+    triggerRevalidate(Array.from(new Set([oldPath, newPath])));
 
     res.json(formatPost(post));
   }
@@ -649,9 +723,10 @@ router.delete(
       return;
     }
 
+    const deletedPath = getCanonicalPostPath(post);
     await post.destroy();
-    // 触发首页 ISR 重生成，确保刷新页面看到最新动态
-    triggerRevalidate();
+    // 触发首页与详情页 ISR 重生成，确保刷新页面看到最新动态
+    triggerRevalidate([deletedPath]);
     res.status(204).send();
   }
 );
@@ -676,14 +751,9 @@ router.patch(
       return;
     }
 
-    if (post.isAd) {
-      res.status(400).json({ message: "广告不支持置顶" });
-      return;
-    }
-
     post.pinned = req.body.pinned;
     await post.save();
-    triggerRevalidate();
+    triggerRevalidate([getCanonicalPostPath(post)]);
     res.json({ id: post.id, pinned: post.pinned });
   }
 );
@@ -715,7 +785,7 @@ router.post(
       // 更新 Post.video：保留 embedCode 等字段，覆盖解析结果
       const updatedVideo = { ...video, ...result };
       await post.update({ video: updatedVideo });
-      triggerRevalidate();
+      triggerRevalidate([getCanonicalPostPath(post)]);
       res.json(result);
     } catch (err: any) {
       if (err instanceof ParseError) {
@@ -1054,8 +1124,8 @@ router.post(
 
     res.json({ liked, likes: likes.map((l: any) => ({ name: l.name, email: l.email || (l as any).user?.email || undefined })) });
 
-    // 触发首页 ISR 重生成，确保刷新页面立即看到最新点赞状态
-    triggerRevalidate();
+    // 触发首页与详情页 ISR 重生成，确保刷新页面立即看到最新点赞状态
+    triggerRevalidate([getCanonicalPostPath(post)]);
   }
 );
 

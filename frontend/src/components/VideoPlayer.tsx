@@ -7,7 +7,9 @@ import { toAbsoluteUrl } from "@/lib/upload";
 import VideoPlayerModal from "./VideoPlayerModal";
 import CustomVideoPlayer from "./CustomVideoPlayer";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { PUBLIC_API_URL } from "@/lib/api-fetch";
+
+const API_URL = PUBLIC_API_URL;
 
 const PLATFORM_LABELS: Record<string, string> = {
   douyin: "抖音",

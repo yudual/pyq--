@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { uploadImage, toAbsoluteUrl } from "@/lib/upload";
 import { resolveAvatar } from "@/lib/avatar";
-import { apiFetch, getToken } from "@/lib/api-fetch";
+import { apiFetch, getToken, PUBLIC_API_URL } from "@/lib/api-fetch";
 import MediaPicker from "@/components/MediaPicker";
 
 interface User {
@@ -42,12 +42,16 @@ function ImageField({
   onChange,
   token,
   rounded = false,
+  hint,
+  placeholder = "留空则使用Cravatar头像",
 }: {
   label: string;
   url: string;
   onChange: (url: string) => void;
   token: string;
   rounded?: boolean;
+  hint?: string;
+  placeholder?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -67,9 +71,31 @@ function ImageField({
 
   return (
     <div className="mb-5">
-      <label className="mb-1.5 block text-xs font-medium text-adm-text-secondary">
-        {label}
-      </label>
+      <div className="mb-1.5 flex items-center justify-between">
+        <label className="text-xs font-medium text-adm-text-secondary">
+          {label}
+        </label>
+        {url && (
+          <div className="flex items-center gap-2 text-[11px]">
+            <a
+              href={toAbsoluteUrl(url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-adm-primary hover:underline"
+            >
+              在新窗口查看
+            </a>
+            <span className="text-adm-text-tertiary">·</span>
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="text-rose-500 hover:underline"
+            >
+              清空
+            </button>
+          </div>
+        )}
+      </div>
       <div className="flex items-center gap-4">
         <div
           className={`relative shrink-0 overflow-hidden bg-adm-input ${
@@ -83,6 +109,7 @@ function ImageField({
               fill
               className="object-cover"
               sizes={rounded ? "64px" : "128px"}
+              unoptimized
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-adm-text-tertiary">
@@ -99,7 +126,7 @@ function ImageField({
             type="text"
             value={url}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="留空则使用Cravatar头像"
+            placeholder={placeholder}
             className="w-full rounded-xl border border-adm-border bg-adm-input px-3 py-2 text-sm text-adm-text transition-colors focus:border-adm-text-secondary focus:bg-adm-input-focus focus:outline-none focus:ring-1 focus:ring-adm-text-secondary"
           />
           <div className="flex gap-2">
@@ -128,11 +155,17 @@ function ImageField({
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) handleFile(file);
+              e.target.value = "";
             }}
             className="hidden"
           />
         </div>
       </div>
+      {hint && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-adm-text-tertiary">
+          {hint}
+        </p>
+      )}
       <MediaPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -201,6 +234,7 @@ function BackgroundImagesEditor({
                 fill
                 className="object-cover"
                 sizes="120px"
+                unoptimized
               />
               <button
                 type="button"
@@ -231,7 +265,7 @@ function BackgroundImagesEditor({
                 addUrl();
               }
             }}
-            placeholder="输入图片URL，回车或点击添加"
+            placeholder="粘贴自有图床图片URL，回车或点击添加"
             className="flex-1 rounded-xl border border-adm-border bg-adm-input px-3 py-2 text-sm text-adm-text transition-colors focus:border-adm-text-secondary focus:bg-adm-input-focus focus:outline-none focus:ring-1 focus:ring-adm-text-secondary"
           />
           <button
@@ -241,7 +275,7 @@ function BackgroundImagesEditor({
             className="flex items-center gap-1 rounded-lg border border-adm-border bg-adm-card px-3 py-2 text-xs text-adm-text-secondary transition-colors hover:bg-adm-card-hover disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
-            添加
+            添加外链
           </button>
         </div>
         <div className="flex gap-2">
@@ -325,7 +359,7 @@ export default function AdminUsers() {
 
     Promise.all([
       apiFetch("/admin/users").then((res) => res.json()),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || "/api"}/settings`, { cache: "no-store" }).then((res) => res.json()),
+      fetch(`${PUBLIC_API_URL}/settings`, { cache: "no-store" }).then((res) => res.json()),
     ])
       .then(([data, settings]: [User[], any]) => {
         if (Array.isArray(data)) {
@@ -469,7 +503,7 @@ export default function AdminUsers() {
               fill
               className="object-cover"
               sizes="80px"
-              unoptimized={previewAvatar.endsWith(".svg")}
+              unoptimized
             />
           </div>
           <div className="text-center sm:text-left">
@@ -523,26 +557,36 @@ export default function AdminUsers() {
 
         {/* 背景图轮播（整合封面图）：添加多张则每次访问随机展示一张 */}
         <div className="mb-5">
-          <label className="mb-1.5 block text-xs font-medium text-adm-text-secondary">
-            背景图（轮播）
-          </label>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="text-xs font-medium text-adm-text-secondary">
+              主页背景图库（首页封面与随机轮播）
+            </label>
+            <a
+              href="/admin/storage"
+              className="text-xs text-adm-primary hover:underline"
+            >
+              图床与存储指引 →
+            </a>
+          </div>
           <BackgroundImagesEditor
             images={backgroundImages}
             onChange={setBackgroundImages}
             token={token || ""}
           />
           <p className="mt-2 text-xs text-adm-text-tertiary">
-            添加一张即为固定封面；添加多张则每次访问首页随机展示其中一张
+            添加一张即为固定封面；添加多张则每次访客访问首页随机展示其中一张。第一张自动同步为主封面。支持直接粘贴自有图床图片链接。
           </p>
         </div>
 
         {/* Avatar */}
         <ImageField
-          label="自定义头像（可选，优先使用）"
+          label="博主头像（可选，优先使用）"
           url={form.avatar}
           onChange={(avatar) => setForm({ ...form, avatar })}
           token={token || ""}
           rounded
+          placeholder="粘贴自有图床链接，留空自动使用Cravatar"
+          hint="显示在首页 Hero 欢迎区、侧边栏、朋友圈个人主页与归档页。建议 1:1 正方形（200x200 以上）。留空则自动根据管理员邮箱获取 Cravatar 头像；支持直接粘贴自有图床外链。"
         />
 
         {/* Nickname */}

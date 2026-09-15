@@ -35,7 +35,6 @@ interface SiteSettingAttributes {
   postCollapseLength: number;
   fontUrl: string;
   fontFamily: string;
-  adOnArchives: boolean;
   /** 评论防刷（限流 + 黑名单）总开关，默认开启 */
   commentAntiSpamEnabled: boolean;
   /** RSS 订阅总开关，关闭后 /feed 返回 404 */
@@ -66,7 +65,7 @@ interface SiteSettingAttributes {
 
 interface SiteSettingCreationAttributes extends Optional<
   SiteSettingAttributes,
-  "id" | "siteName" | "description" | "keywords" | "domain" | "beian" | "footerHtml" | "decorationImage" | "faviconUrl" | "ogImage" | "backgroundImages" | "darkModeEnabled" | "darkModeStartTime" | "darkModeEndTime" | "emailNotifyEnabled" | "notifyEmail" | "smtpHost" | "smtpPort" | "smtpSecure" | "smtpUser" | "smtpPass" | "smtpFrom" | "emailTemplate" | "amapJsKey" | "amapSecurityJsCode" | "amapKey" | "beianUrl" | "socialLinks" | "postCollapseLength" | "fontUrl" | "fontFamily" | "adOnArchives" | "commentAntiSpamEnabled" | "rssEnabled" | "rssIncludeMoments" | "doubanId" | "doubanCache" | "doubanSyncStatus" | "doubanSyncedAt" | "doubanLastError" | "doubanSyncLeaseId" | "doubanSyncLeaseExpiresAt" | "doubanLastAttemptAt" | "bannedWords" | "musicAutoplay"
+  "id" | "siteName" | "description" | "keywords" | "domain" | "beian" | "footerHtml" | "decorationImage" | "faviconUrl" | "ogImage" | "backgroundImages" | "darkModeEnabled" | "darkModeStartTime" | "darkModeEndTime" | "emailNotifyEnabled" | "notifyEmail" | "smtpHost" | "smtpPort" | "smtpSecure" | "smtpUser" | "smtpPass" | "smtpFrom" | "emailTemplate" | "amapJsKey" | "amapSecurityJsCode" | "amapKey" | "beianUrl" | "socialLinks" | "postCollapseLength" | "fontUrl" | "fontFamily" | "commentAntiSpamEnabled" | "rssEnabled" | "rssIncludeMoments" | "doubanId" | "doubanCache" | "doubanSyncStatus" | "doubanSyncedAt" | "doubanLastError" | "doubanSyncLeaseId" | "doubanSyncLeaseExpiresAt" | "doubanLastAttemptAt" | "bannedWords" | "musicAutoplay"
 > {}
 
 class SiteSetting
@@ -104,7 +103,6 @@ class SiteSetting
   declare postCollapseLength: number;
   declare fontUrl: string;
   declare fontFamily: string;
-  declare adOnArchives: boolean;
   declare commentAntiSpamEnabled: boolean;
   declare rssEnabled: boolean;
   declare rssIncludeMoments: boolean;
@@ -275,11 +273,6 @@ SiteSetting.init(
       type: DataTypes.STRING(200),
       allowNull: false,
       defaultValue: "",
-    },
-    adOnArchives: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false,
     },
     commentAntiSpamEnabled: {
       type: DataTypes.BOOLEAN,

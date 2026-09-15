@@ -1,115 +1,66 @@
-import CoverHeader from "@/components/CoverHeader";
 import DesktopDecorations from "@/components/DesktopDecorations";
 import PostList from "@/components/PostList";
-import TopBar from "@/components/TopBar";
-import Sidebar from "@/components/Sidebar";
-import ArticleListSidebar from "@/components/ArticleListSidebar";
 import FloatingActions from "@/components/FloatingActions";
 import Footer from "@/components/Footer";
 import DesktopFooter from "@/components/DesktopFooter";
 import AdminNotifications from "@/components/AdminNotifications";
 import EditPostModal from "@/components/EditPostModal";
 import ProfileScrollRestoration from "@/components/profile/ProfileScrollRestoration";
-import { owner as fallbackOwner, User } from "@/lib/mock-data";
-import { getApiUrl } from "@/lib/api-fetch";
+import HeroSection from "@/components/home/HeroSection";
+import { fetchOwner, fetchPostsPage, fetchSiteSettings } from "@/lib/server-data";
 
-const API_URL = getApiUrl();
 const PAGE_SIZE = 10;
 
 // ISR：10 秒重新验证（后端写操作后会触发按需重验证，10秒仅作安全网）
 export const revalidate = 10;
 
-async function getOwner(): Promise<User> {
-  try {
-    const res = await fetch(`${API_URL}/users/owner`, { next: { revalidate: 10 } });
-    if (!res.ok) return fallbackOwner;
-    return await res.json();
-  } catch {
-    return fallbackOwner;
-  }
-}
-
-async function getPosts() {
-  try {
-    const res = await fetch(`${API_URL}/posts?page=1&limit=${PAGE_SIZE}`, { next: { revalidate: 10 } });
-    if (!res.ok) return { data: [], hasMore: false };
-    const json = await res.json();
-    return { data: json.data || [], hasMore: json.pagination?.hasMore ?? false };
-  } catch {
-    return { data: [], hasMore: false };
-  }
-}
-
-async function getSettings() {
-  try {
-    const res = await fetch(`${API_URL}/settings`, { next: { revalidate: 10 } });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-/** 从网站设置中解析背景图轮播列表；为空则回退到用户封面 */
-function getCoverList(settings: any, fallback: string): string[] {
-  const raw = settings?.backgroundImages;
-  if (!raw) return [fallback];
-  try {
-    const images = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (Array.isArray(images) && images.length > 0) {
-      return images;
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return [fallback];
-}
-
 export default async function Home() {
-  const [owner, postsData, settings] = await Promise.all([getOwner(), getPosts(), getSettings()]);
-  const coverUrls = getCoverList(settings, owner.cover);
+  const [owner, postsData, settings] = await Promise.all([
+    fetchOwner(),
+    fetchPostsPage(`page=1&limit=${PAGE_SIZE}`),
+    fetchSiteSettings(),
+  ]);
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg">
+    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
-      <div className="md:pt-6">
-        <div
-          id="scroll-root"
-          className="md:fixed md:top-6 md:left-[calc(50%-300px)] md:z-10 md:h-[calc(100vh-48px)] md:w-[600px] md:overflow-y-auto md:rounded-2xl md:bg-wechat-white md:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] dark:md:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          <main className="relative w-full bg-wechat-white pb-8 md:pb-12">
-            <TopBar coverHeight={300} />
-            <CoverHeader user={owner} avatarHref="/archives" coverUrls={coverUrls} />
+      {/* 1. 第一幕：极简质感出场 (Hero 100vh) */}
+      <HeroSection owner={owner} siteSettings={settings} />
 
-            <div className="md:hidden">
-              <AdminNotifications />
+      {/* 2. 第二幕：微信朋友圈朴素动态流 */}
+      <div id="moments-section" className="relative mx-auto w-full max-w-2xl px-3 sm:px-4 pt-6 sm:pt-8 pb-20 scroll-mt-16 sm:scroll-mt-20">
+        <main className="relative w-full overflow-hidden rounded-3xl bg-wechat-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] border border-neutral-200/60 dark:border-neutral-800/80">
+          {/* 动态卡片顶部栏 */}
+          <div className="flex items-center justify-between border-b border-black/[0.05] dark:border-white/[0.06] px-5 py-3.5 bg-neutral-50/60 dark:bg-neutral-800/40">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">博客动态 · 岁岁念与随笔</span>
+              <span className="rounded-full bg-neutral-200/70 dark:bg-neutral-700/70 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+                {postsData.data.length} 条记录
+              </span>
             </div>
+            <span className="text-xs text-neutral-400 dark:text-neutral-500">
+              全频道聚合
+            </span>
+          </div>
 
-            <PostList
-              initialPosts={postsData.data}
-              initialHasMore={postsData.hasMore}
-              initialPage={1}
-            />
-            <Footer />
-          </main>
-        </div>
+          <div className="pt-2">
+            <AdminNotifications />
+          </div>
 
-        {/* Desktop right sidebar — fixed to the right of main so it stays
-            in view as the body scrolls natively. */}
-        <Sidebar owner={owner} />
-
-        {/* Desktop left sidebar — article list with covers */}
-        <ArticleListSidebar />
+          <PostList
+            initialPosts={postsData.data}
+            initialHasMore={postsData.hasMore}
+            initialPage={1}
+            initialError={postsData.error}
+          />
+          <Footer />
+        </main>
       </div>
 
-      {/* Floating actions: theme toggle + back to top (bottom-right) */}
+      {/* 悬浮操作与弹窗 */}
       <FloatingActions />
-
-      {/* Desktop footer: copyright + beian (fixed bottom-left) */}
       <DesktopFooter />
-
-      {/* Edit post modal (triggered from PostCard ActionMenu for logged-in admin) */}
       <EditPostModal />
       <ProfileScrollRestoration storageKey="home-scroll-y" waitForFadeIn={false} />
     </div>

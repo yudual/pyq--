@@ -194,63 +194,10 @@ export default function ProfileTopBar({ coverHeight = 300, initialBgAlpha = 0, s
             <ArrowLeft className="h-[22px] w-[22px]" strokeWidth={2.5} />
           </button>
 
-          {/* Right: music player */}
-          <div className="flex min-w-0 items-center gap-1.5">
-            {(!musicLoaded && !activePostMusic) || switching ? (
-              <div className={`flex items-center gap-1.5 rounded-full pl-1 pr-2 ${darkUI ? "bg-black/5 text-gray-700 dark:bg-white/10 dark:text-gray-200" : "bg-white/15 text-white backdrop-blur-sm"}`}>
-                <div className="h-7 w-7 shrink-0 animate-pulse rounded-full bg-current/25" />
-                <div className="h-2.5 w-14 animate-pulse rounded-full bg-current/25" />
-              </div>
-            ) : (
-              <div className={`flex items-center gap-1.5 rounded-full pl-1 pr-2 transition-colors ${!musicUrl && !activePostMusic ? "opacity-50" : darkUI ? "bg-black/5 text-gray-700 dark:bg-white/10 dark:text-gray-200" : "bg-white/15 text-white backdrop-blur-sm"}`}>
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  disabled={!musicUrl && !activePostMusic && playlist.length === 0}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10 disabled:cursor-not-allowed"
-                  aria-label={isPlaying ? "暂停" : "播放"}
-                >
-                  {isPlaying ? <Pause className="h-3.5 w-3.5" fill="currentColor" /> : <Play className="h-3.5 w-3.5" fill="currentColor" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { if (lyric && lyric.length > 0) setShowLyricPanel(true); }}
-                  disabled={!lyric || lyric.length === 0}
-                  className={`flex min-w-0 max-w-[160px] items-center truncate text-[11px] transition-opacity hover:opacity-80 disabled:cursor-default md:max-w-[240px] ${currentLyric ? "font-medium" : ""}`}
-                  title={audioError ? audioErrorMessage || "播放地址不可用" : lyric && lyric.length > 0 ? "点击查看歌词" : ""}
-                >
-                  <span className="truncate">
-                    {!musicUrl && !activePostMusic && playlist.length === 0 ? "未设置" : audioError ? "播放不可用" : currentLyric ? currentLyric : activePostMusic?.name || musicName || "音乐"}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleMute}
-                  disabled={(!musicUrl && !activePostMusic) || audioError}
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10 disabled:opacity-40"
-                  aria-label={muted ? "取消静音" : "静音"}
-                >
-                  {muted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
-                </button>
-                {!activePostMusic && playlist.length > 1 && (
-                  <>
-                    <button type="button" onClick={playPrev} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10" aria-label="上一首">
-                      <SkipBack className="h-3 w-3" fill="currentColor" />
-                    </button>
-                    <button type="button" onClick={playNext} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10" aria-label="下一首">
-                      <SkipForward className="h-3 w-3" fill="currentColor" />
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Right: spacer */}
+          <div className="flex-1 min-w-0" />
         </div>
       </header>
-
-      {showLyricPanel && lyric && lyric.length > 0 && (
-        <LyricPanel lines={lyric} currentIndex={currentLyricIndex} onClose={() => setShowLyricPanel(false)} />
-      )}
     </>
   );
 }

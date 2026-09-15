@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PenLine, User, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { getApiUrl } from "@/lib/api-fetch";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -20,22 +19,35 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await fetch(`${getApiUrl()}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ account, password }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        setError(data.message || "登录失败");
+      if (res.ok && data.token) {
+        localStorage.setItem("admin_token", data.token);
+        if (data.user) {
+          localStorage.setItem("user", JSON.stringify(data.user));
+        }
+        router.replace("/admin");
         return;
       }
 
-      localStorage.setItem("admin_token", data.token);
-      router.replace("/admin");
-    } catch {
-      setError("网络错误，请检查后端服务");
+      if (res.status === 400 || res.status === 401) {
+        setError(data.message || "账号或密码错误");
+        return;
+      }
+
+      throw new Error(data.message || "登录请求异常");
+    } catch (err) {
+      if (err instanceof TypeError) {
+        setError("后端服务暂时不可用，请确认服务已启动后重试");
+      } else {
+        setError(err instanceof Error ? err.message : "登录失败，请稍后重试");
+      }
     } finally {
       setLoading(false);
     }

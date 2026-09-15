@@ -27,11 +27,19 @@ export default function ProfileScrollRestoration({
       history.scrollRestoration = "manual";
     }
 
+    const isScrollable = (element: HTMLElement): boolean => {
+      const style = window.getComputedStyle(element);
+      return (
+        (style.overflowY === "auto" || style.overflowY === "scroll") &&
+        element.scrollHeight > element.clientHeight
+      );
+    };
+
     const getScrollEl = (): HTMLElement | Window => {
       const isDesktop = window.matchMedia("(min-width: 768px)").matches;
       if (isDesktop) {
         const el = document.getElementById("scroll-root");
-        if (el) return el;
+        if (el && isScrollable(el)) return el;
       }
       return window;
     };

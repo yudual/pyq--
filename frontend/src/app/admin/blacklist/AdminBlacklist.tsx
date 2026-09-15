@@ -427,7 +427,7 @@ export default function AdminBlacklist() {
               type="text"
               value={formReason}
               onChange={(e) => setFormReason(e.target.value)}
-              placeholder="封禁原因（选填，如：刷评论、广告）"
+              placeholder="封禁原因（选填，如：刷评论、恶意灌水）"
               className="rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm text-adm-text focus:border-adm-text-secondary focus:outline-none"
             />
             <select

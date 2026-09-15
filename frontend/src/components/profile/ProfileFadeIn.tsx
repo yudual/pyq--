@@ -56,7 +56,7 @@ export default function ProfileFadeIn({ children }: { children: React.ReactNode 
   return (
     <div
       id="profile-content"
-      className={`flex flex-1 flex-col ${ready ? (done ? "" : "profile-fade-in") : "opacity-0"}`}
+      className={`flex flex-1 flex-col ${ready && !done ? "profile-fade-in" : ""}`}
       onAnimationEnd={() => setDone(true)}
     >
       {children}

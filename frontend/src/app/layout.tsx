@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
-import GlobalMusicManager from "@/components/GlobalMusicManager";
-import MusicFloatingCard from "@/components/MusicFloatingCard";
 import LoadingBar from "@/components/LoadingBar";
 import EmojiFadeController from "@/components/EmojiFadeController";
+import FloatingNav from "@/components/navigation/FloatingNav";
 import { getApiUrl } from "@/lib/api-fetch";
 
 const API_URL = getApiUrl();
@@ -147,8 +146,7 @@ export default async function RootLayout({
         <div id="initial-loading-bar" />
         <LoadingBar />
         <ThemeProvider>
-          <GlobalMusicManager />
-          <MusicFloatingCard />
+          <FloatingNav />
           {children}
           <EmojiFadeController />
         </ThemeProvider>

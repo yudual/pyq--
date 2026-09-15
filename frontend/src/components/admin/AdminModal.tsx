@@ -23,7 +23,6 @@ const WIDTH_MAP: Record<NonNullable<AdminModalProps["width"]>, string> = {
 
 /**
  * 后端管理通用弹窗：createPortal + 进入/退出动画。
- * 参考 AdminAds.tsx 的弹窗实现：animate-overlay-in/out + animate-modal-in/out。
  * 移动端从底部滑入（rounded-t-xl），桌面端居中（rounded-xl）。
  */
 export default function AdminModal({

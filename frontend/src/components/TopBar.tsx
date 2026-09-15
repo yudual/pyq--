@@ -1,8 +1,10 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   User,
   UserRound,
@@ -34,10 +36,10 @@ import {
   Pencil,
   Heart,
   MessageSquare,
-  Megaphone,
   Library,
   Check,
   MoreVertical,
+  Link2,
 } from "lucide-react";
 import { cravatarUrl } from "@/lib/avatar";
 import { getGlobalAudio } from "@/lib/global-audio";
@@ -430,104 +432,8 @@ export default function TopBar({ coverHeight = 300 }: TopBarProps) {
             "--topbar-blur": blur,
           } as React.CSSProperties}
         >
-          {/* Left: music player + lyric (mobile: full width, desktop: same) */}
-          {/* 后端未配置歌单时隐藏整个音乐区域（activePostMusic 仍可接管播放） */}
+          {/* Left: spacer */}
           <div className="flex-1 min-w-0" />
-          {(!musicLoaded || musicUrl || playlist.length > 0 || activePostMusic) && (
-          <div className="flex min-w-0 items-center gap-1.5">
-            {/* Music player + lyric */}
-            {!musicLoaded || switching ? (
-              // 骨架占位：脉冲动画，避免"加载中"文字闪烁
-              <div
-                className={`flex items-center gap-1.5 rounded-full pl-1 pr-2 ${
-                  frosted
-                    ? "bg-black/5 text-gray-700 dark:bg-white/10 dark:text-gray-200"
-                    : "bg-white/15 text-white backdrop-blur-sm"
-                }`}
-              >
-                <div className="h-7 w-7 shrink-0 animate-pulse rounded-full bg-current/25" />
-                <div className="h-2.5 w-14 animate-pulse rounded-full bg-current/25" />
-              </div>
-            ) : (
-              <div
-                className={`flex items-center gap-1.5 rounded-full pl-1 pr-2 transition-colors ${
-                  !musicUrl && !activePostMusic
-                    ? "opacity-50"
-                    : frosted
-                      ? "bg-black/5 text-gray-700 dark:bg-white/10 dark:text-gray-200"
-                      : "bg-white/15 text-white backdrop-blur-sm"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  disabled={!musicUrl && !activePostMusic && playlist.length === 0}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10 disabled:cursor-not-allowed"
-                  aria-label={isPlaying ? "暂停" : "播放"}
-                >
-                  {isPlaying ? (
-                    <Pause className="h-3.5 w-3.5" fill="currentColor" />
-                  ) : (
-                    <Play className="h-3.5 w-3.5" fill="currentColor" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (lyric && lyric.length > 0) setShowLyricPanel(true);
-                  }}
-                  disabled={!lyric || lyric.length === 0}
-                  className={`flex min-w-0 max-w-[180px] items-center truncate text-[11px] transition-opacity hover:opacity-80 disabled:cursor-default md:max-w-[260px] ${currentLyric ? "font-medium" : ""}`}
-                  title={audioError ? audioErrorMessage || "播放地址不可用" : lyric && lyric.length > 0 ? "点击查看歌词" : ""}
-                >
-                  <span className="truncate">
-                    {!musicUrl && !activePostMusic && playlist.length === 0
-                      ? "未设置"
-                      : audioError
-                        ? "播放不可用"
-                        : currentLyric
-                          ? currentLyric
-                          : activePostMusic?.name || musicName || "音乐"}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleMute}
-                  disabled={(!musicUrl && !activePostMusic) || audioError}
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10 disabled:opacity-40"
-                  aria-label={muted ? "取消静音" : "静音"}
-                >
-                  {muted ? (
-                    <VolumeX className="h-3 w-3" />
-                  ) : (
-                    <Volume2 className="h-3 w-3" />
-                  )}
-                </button>
-                {/* 歌单模式才显示上一首/下一首；动态音乐接管时隐藏 */}
-                {!activePostMusic && playlist.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={playPrev}
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10"
-                      aria-label="上一首"
-                    >
-                      <SkipBack className="h-3 w-3" fill="currentColor" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={playNext}
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10"
-                      aria-label="下一首"
-                    >
-                      <SkipForward className="h-3 w-3" fill="currentColor" />
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-          )}
 
           {/* Right: search + friends + publish/login */}
           <div className="relative flex shrink-0 items-center gap-1.5">
@@ -580,7 +486,9 @@ export default function TopBar({ coverHeight = 300 }: TopBarProps) {
                       key={item.id}
                       type="button"
                       onClick={() => {
-                        const path = item.type === "article"
+                        const path = (item.category === "项目" || item.type === "project")
+                          ? `/projects/${item.shortId || item.id}`
+                          : item.type === "article"
                           ? `/articles/${item.shortId || item.id}`
                           : `/moments/${item.shortId || item.id}`;
                         setShowSearch(false);
@@ -1006,15 +914,18 @@ export function PublishModal({
   onClose,
   onPublished,
   editPost,
+  defaultCategory,
 }: {
   token: string;
   onClose: () => void;
   onPublished: () => void;
   /** 传入则进入编辑模式（PUT /posts/:id），否则为发表模式（POST /posts） */
   editPost?: Post;
+  defaultCategory?: string;
 }) {
   const isEdit = !!editPost;
   const [content, setContent] = useState(editPost?.content ?? "");
+  const [category, setCategory] = useState<string>(editPost?.category || defaultCategory || "岁岁念");
   const [images, setImages] = useState<PostImage[]>(editPost?.images ?? []);
   const [uploading, setUploading] = useState(false);
   // 图片上传模式：normal=普通图片，live=实况图（需配对图片+视频），video=短视频
@@ -1081,8 +992,34 @@ export function PublishModal({
   // 互动权限：关闭点赞/评论
   const [likesDisabled, setLikesDisabled] = useState(editPost?.likesDisabled ?? false);
   const [commentsDisabled, setCommentsDisabled] = useState(editPost?.commentsDisabled ?? false);
-  // 作为广告发布：勾选后该动态以广告形式展示
-  const [isAd, setIsAd] = useState(!!editPost?.isAd);
+  const [showExternalUrlInput, setShowExternalUrlInput] = useState(false);
+  const [externalImageUrl, setExternalImageUrl] = useState("");
+
+  const handleAddExternalImage = () => {
+    const raw = externalImageUrl.trim();
+    if (!raw) return;
+    const urls = raw
+      .split(/[\n,\s]+/)
+      .map((u) => u.trim())
+      .filter((u) => /^https?:\/\//i.test(u));
+
+    if (urls.length === 0) {
+      setError("请输入以 http:// 或 https:// 开头的有效图片链接");
+      return;
+    }
+
+    const availableSlots = 9 - images.length;
+    if (availableSlots <= 0) {
+      setError("最多只能添加 9 张图片");
+      return;
+    }
+
+    const toAdd = urls.slice(0, availableSlots);
+    setImages((prev) => [...prev, ...toAdd]);
+    setExternalImageUrl("");
+    setShowExternalUrlInput(false);
+    setError("");
+  };
 
   const uploadOne = async (
     file: File,
@@ -1091,7 +1028,12 @@ export function PublishModal({
     try {
       return kind === "image" ? await uploadImage(file, token) : await uploadVideo(file, token);
     } catch (err: any) {
-      setError(err.message || "上传失败");
+      const msg = err.message || "上传失败";
+      if (msg.includes("R2 存储未配置") || msg.includes("缺少 R2")) {
+        setError("未配置云端存储 R2；若您拥有自有图床，可直接点击下方「添加图床外链」粘贴图片 URL。");
+      } else {
+        setError(msg);
+      }
       return null;
     }
   };
@@ -1421,6 +1363,7 @@ export function PublishModal({
       // 视频独占：video 存在时 images 强制为 []
       const payload = isEdit
         ? {
+            category: category.trim() || "",
             content: isContentEmpty(content) ? "" : content,
             images: uploadMode === "video" ? [] : (images.length > 0 ? images : []),
             location: location || null,
@@ -1428,11 +1371,11 @@ export function PublishModal({
             linkCard: linkCard || null,
             video: uploadMode === "video" ? video : null,
             douban: douban || null,
-            isAd,
             likesDisabled,
             commentsDisabled,
           }
         : {
+            category: category.trim() || "岁岁念",
             content: isContentEmpty(content) ? undefined : content,
             images: uploadMode === "video" ? [] : (images.length > 0 ? images : undefined),
             location: location || undefined,
@@ -1440,7 +1383,6 @@ export function PublishModal({
             linkCard: linkCard || undefined,
             video: uploadMode === "video" ? video || undefined : undefined,
             douban: douban || undefined,
-            isAd,
             likesDisabled,
             commentsDisabled,
           };
@@ -1504,17 +1446,65 @@ export function PublishModal({
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {/* 频道边界清晰引导 */}
+        <div className="mb-3 flex items-center justify-between rounded-xl border border-dashed border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2 text-xs text-neutral-600 dark:text-neutral-400">
+          <span>💡 发布深度长文或开源项目？</span>
+          <div className="flex items-center gap-2 font-medium">
+            <Link
+              href="/admin/articles/new"
+              onClick={handleClose}
+              className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+            >
+              写文章 →
+            </Link>
+            <span>·</span>
+            <Link
+              href="/admin/projects/new"
+              onClick={handleClose}
+              className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+            >
+              新建项目 →
+            </Link>
+          </div>
+        </div>
+
         {/* Rich text editor - WeChat official account style */}
         <RichTextEditor
           value={content}
           onChange={setContent}
-          placeholder="这一刻的想法..."
+          placeholder="这一刻的想法（朋友圈 / 岁岁念动态）..."
           minHeight={200}
           onLinkCard={handleFetchLinkCard}
           linkCardLoading={linkCardLoading}
           hasLinkCard={!!linkCard}
           onDouban={() => setShowDoubanPicker(true)}
         />
+
+        {/* 分类快捷药丸（仅属于动态/朋友圈维度的标签，与文章、项目严格分离） */}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-wechat-time text-[11px]">归类：</span>
+          {["岁岁念", "日常", "随想", "随手拍", "摄影", "生活"].map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setCategory(category === cat ? "" : cat)}
+              className={`rounded-full px-2.5 py-0.5 transition-all text-xs font-medium cursor-pointer ${
+                category === cat
+                  ? "bg-wechat-text text-wechat-white dark:bg-white dark:text-neutral-900"
+                  : "bg-wechat-bubble text-wechat-time hover:bg-wechat-hover dark:bg-white/5 dark:text-gray-400"
+              }`}
+            >
+              #{cat}
+            </button>
+          ))}
+          <input
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="自定义标签"
+            className="w-20 rounded-full border border-wechat-border/70 dark:border-white/10 bg-transparent px-2 py-0.5 text-xs text-wechat-text dark:text-gray-200 focus:outline-hidden placeholder:text-wechat-time"
+          />
+        </div>
 
         {/* Image grid - 微信风格 3 列网格 */}
         {/* 上传模式切换：普通图片 / 实况图 / 短视频（视频独占，不可与图片共存） */}
@@ -1646,30 +1636,82 @@ export function PublishModal({
           </p>
         )}
 
-        {/* 从媒体库选择 — 小胶囊按钮，点击展开三排横向滚动图片列表 */}
+        {/* 从媒体库选择与图床外链快捷导入 */}
+        {uploadMode === "normal" && images.length < 9 && (
+          <div className="mt-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowExternalUrlInput(!showExternalUrlInput)}
+                className={`flex items-center gap-1 rounded-full border border-wechat-border bg-wechat-bubble px-3 py-1 text-xs text-wechat-time transition-colors hover:bg-wechat-hover dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 ${
+                  showExternalUrlInput ? "text-wechat-text dark:text-white font-medium" : ""
+                }`}
+              >
+                <Link2 className="h-3.5 w-3.5" />
+                添加图床外链
+              </button>
+
+              {(mediaLoading || mediaItems.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!showMediaPicker) {
+                      // 展开：先显示容器（骨架），延迟 200ms 再渲染图片，避免动画+渲染同时进行导致卡顿
+                      setShowMediaPicker(true);
+                      setMediaRendered(false);
+                      setTimeout(() => setMediaRendered(true), 200);
+                    } else {
+                      // 收起：立即隐藏
+                      setMediaRendered(false);
+                      setShowMediaPicker(false);
+                    }
+                  }}
+                  className={`flex items-center gap-1 rounded-full border border-wechat-border bg-wechat-bubble px-3 py-1 text-xs text-wechat-time transition-colors hover:bg-wechat-hover dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 ${
+                    showMediaPicker ? "text-wechat-text" : ""
+                  }`}
+                >
+                  <Library className="h-3.5 w-3.5" />
+                  从媒体库导入
+                </button>
+              )}
+            </div>
+
+            {showExternalUrlInput && (
+              <div className="flex items-center gap-2 rounded-xl border border-wechat-border bg-wechat-bubble/60 p-2 dark:border-white/10 dark:bg-white/5">
+                <input
+                  type="text"
+                  value={externalImageUrl}
+                  onChange={(e) => setExternalImageUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddExternalImage();
+                    }
+                  }}
+                  placeholder="粘贴自有图床图片 URL（支持以空格或换行分隔多张）..."
+                  className="flex-1 bg-transparent px-2 py-1 text-xs text-wechat-text placeholder:text-wechat-time focus:outline-none dark:text-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddExternalImage}
+                  disabled={!externalImageUrl.trim()}
+                  className="rounded-lg bg-green-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-green-600 disabled:opacity-40"
+                >
+                  添加
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExternalUrlInput(false)}
+                  className="p-1 text-xs text-wechat-time hover:text-wechat-text"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {uploadMode === "normal" && images.length < 9 && (mediaLoading || mediaItems.length > 0) && (
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={() => {
-                if (!showMediaPicker) {
-                  // 展开：先显示容器（骨架），延迟 200ms 再渲染图片，避免动画+渲染同时进行导致卡顿
-                  setShowMediaPicker(true);
-                  setMediaRendered(false);
-                  setTimeout(() => setMediaRendered(true), 200);
-                } else {
-                  // 收起：立即隐藏
-                  setMediaRendered(false);
-                  setShowMediaPicker(false);
-                }
-              }}
-              className={`flex items-center gap-1 rounded-full border border-wechat-border bg-wechat-bubble px-3 py-1 text-xs text-wechat-time transition-colors hover:bg-wechat-hover dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 ${
-                showMediaPicker ? "text-wechat-text" : ""
-              }`}
-            >
-              <Library className="h-3.5 w-3.5" />
-              从媒体库导入
-            </button>
+          <div className="mt-1">
             {showMediaPicker && (
               <div className="animate-emoji-fade-in mt-2">
                 {!mediaRendered || mediaLoading ? (
@@ -2087,27 +2129,6 @@ export function PublishModal({
               </div>
             </div>
           )}
-
-          {/* 作为广告发布 — 勾选后该动态以广告形式展示在信息流广告位 */}
-          <div className="flex items-center gap-3 border-t border-black/5 py-3 dark:border-white/5">
-            <Megaphone className="h-5 w-5 shrink-0 text-wechat-time" />
-            <span className="flex-1 text-[15px] text-wechat-text dark:text-gray-200">作为广告</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isAd}
-              onClick={() => setIsAd((v) => !v)}
-              className={`relative h-[22px] w-[40px] rounded-full transition-colors ${
-                isAd ? "bg-green-500" : "bg-black/15 dark:bg-white/20"
-              }`}
-            >
-              <span
-                className={`absolute left-[2px] top-[2px] h-[18px] w-[18px] rounded-full bg-white shadow transition-transform ${
-                  isAd ? "translate-x-[18px]" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
 
           {/* 允许点赞 — 微信朋友圈风格开关行 */}
           <div className="flex items-center gap-3 border-t border-black/5 py-3 dark:border-white/5">

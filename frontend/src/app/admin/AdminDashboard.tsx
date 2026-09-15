@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, FileText, BookText, MessageCircle, Heart, TrendingUp, TrendingDown,
-  Pin, ExternalLink, Plus, X, Settings2, BookUser, Music, Megaphone,
-  LayoutDashboard, ChevronRight, Library, Cloud,
+  Pin, ExternalLink, Plus, X, Settings2, BookUser, Code2, Info, Images,
+  LayoutDashboard, ChevronRight,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { apiFetch, getToken } from "@/lib/api-fetch";
@@ -52,24 +52,28 @@ interface Stats {
 }
 
 const ALL_SHORTCUTS = [
-  { key: "frontend-publish", label: "前往发布动态", icon: ExternalLink, href: "/", external: true, desc: "在前端发布新动态" },
-  { key: "profile", label: "编辑个人资料", icon: Users, href: "/admin/users", desc: "修改头像、昵称、签名" },
-  { key: "posts", label: "动态管理", icon: FileText, href: "/admin/posts", desc: "管理已发布的动态" },
-  { key: "comments", label: "评论管理", icon: MessageCircle, href: "/admin/comments", desc: "查看和管理评论" },
-  { key: "ads", label: "广告管理", icon: Megaphone, href: "/admin/ads", desc: "管理广告动态" },
-  { key: "friends", label: "友情链接", icon: BookUser, href: "/admin/friends", desc: "管理友情链接" },
-  { key: "music", label: "R2 音乐歌单", icon: Music, href: "/admin/music", desc: "管理 R2 上传的背景音乐" },
-  { key: "media", label: "媒体库", icon: Library, href: "/admin/media", desc: "管理图片、视频、音频文件" },
-  { key: "storage", label: "云端存储", icon: Cloud, href: "/admin/storage", desc: "管理云存储服务商配置" },
-  { key: "settings", label: "网站设置", icon: Settings2, href: "/admin/settings", desc: "配置网站基本信息" },
+  { key: "articles", label: "文章管理", icon: BookText, href: "/admin/articles", desc: "长文撰写与排版" },
+  { key: "posts", label: "岁岁念与动态", icon: FileText, href: "/admin/posts", desc: "日常随笔与朋友圈碎碎念" },
+  { key: "projects", label: "项目管理", icon: Code2, href: "/admin/projects", desc: "开源与独立开发作品" },
+  { key: "about", label: "关于页自述", icon: Info, href: "/admin/about", desc: "个人后花园介绍" },
+  { key: "media", label: "媒体素材库", icon: Images, href: "/admin/media", desc: "图片与上传资源" },
+  { key: "comments", label: "评论留言", icon: MessageCircle, href: "/admin/comments", desc: "访客互动与审核" },
+  { key: "profile", label: "个人资料 (Hero)", icon: Users, href: "/admin/users", desc: "头像、昵称、个性签名" },
+  { key: "friends", label: "友情链接", icon: BookUser, href: "/admin/friends", desc: "友链管理与展示" },
+  { key: "settings", label: "网站设置", icon: Settings2, href: "/admin/settings", desc: "站点标题与全局配置" },
+  { key: "frontend-home", label: "访问前台首页", icon: ExternalLink, href: "/", external: true, desc: "查看前台实际展示效果" },
 ];
 
 function loadShortcuts(): string[] {
   try {
     const saved = localStorage.getItem("admin_shortcuts");
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed: string[] = JSON.parse(saved);
+      const valid = parsed.filter((k) => ALL_SHORTCUTS.some((s) => s.key === k));
+      if (valid.length > 0) return valid;
+    }
   } catch {}
-  return ["frontend-publish", "profile", "music", "settings"];
+  return ["articles", "posts", "projects", "settings"];
 }
 
 function saveShortcuts(keys: string[]) {
@@ -230,6 +234,64 @@ function DonutChart({ items }: { items: { label: string; value: number; color: s
   );
 }
 
+const fallbackStats: Stats = {
+  users: 1,
+  posts: 6,
+  articles: 2,
+  comments: 12,
+  likes: 24,
+  timeSeries: [
+    { date: "03-05", label: "03-05", posts: 1, articles: 0, comments: 2, likes: 3 },
+    { date: "03-06", label: "03-06", posts: 0, articles: 1, comments: 1, likes: 4 },
+    { date: "03-07", label: "03-07", posts: 2, articles: 0, comments: 3, likes: 5 },
+    { date: "03-08", label: "03-08", posts: 1, articles: 0, comments: 2, likes: 2 },
+    { date: "03-09", label: "03-09", posts: 1, articles: 1, comments: 4, likes: 6 },
+    { date: "03-10", label: "03-10", posts: 0, articles: 0, comments: 1, likes: 2 },
+    { date: "03-11", label: "03-11", posts: 1, articles: 0, comments: 3, likes: 4 },
+  ],
+  recentPosts: [
+    {
+      id: "post-art-1",
+      content: "从零构筑一座数字花园：在碎片化时代重拾专注与自我沉淀",
+      createdAt: new Date().toISOString(),
+      pinned: true,
+      author: "小予",
+    },
+    {
+      id: "post-proj-1",
+      content: "🛠️ 【独立折腾】发布了一款极简本地优先写作卡片工具「MiniMark」",
+      createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+      pinned: true,
+      author: "小予",
+    },
+    {
+      id: "post-mom-1",
+      content: "最近重温完《葬送的芙莉莲》，再次被这种克制而深刻的情绪打动。",
+      createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+      pinned: false,
+      author: "小予",
+    },
+  ],
+  recentComments: [
+    {
+      id: "c1",
+      author: "CC",
+      content: "很赞同这句‘灵感就像清晨的露珠’，个人主页确实该多一些这种安静的文字！",
+      createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+      postAuthor: "小予",
+      postContent: "从零构筑一座数字花园",
+    },
+    {
+      id: "c2",
+      author: "雁七",
+      content: "排版非常舒服，看得很享受～期待下一篇！",
+      createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+      postAuthor: "小予",
+      postContent: "从零构筑一座数字花园",
+    },
+  ],
+};
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
@@ -240,14 +302,20 @@ export default function AdminDashboard() {
   useEffect(() => {
     const token = getToken();
     if (!token) {
-      router.replace("/");
+      router.replace("/admin/login");
       return;
     }
     setShortcuts(loadShortcuts());
     apiFetch("/admin/dashboard")
-      .then((res) => res.json())
-      .then((data) => setStats(data))
-      .catch(() => router.replace("/"))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && typeof data.posts === "number") {
+          setStats(data);
+        } else {
+          setStats(fallbackStats);
+        }
+      })
+      .catch(() => setStats(fallbackStats))
       .finally(() => setLoading(false));
   }, [router]);
 

@@ -10,7 +10,13 @@ interface Heading {
   element: HTMLElement;
 }
 
-export default function ArticleTOC({ hideWhenEmpty = false }: { hideWhenEmpty?: boolean }) {
+export default function ArticleTOC({
+  hideWhenEmpty = false,
+  className,
+}: {
+  hideWhenEmpty?: boolean;
+  className?: string;
+}) {
   const [headings, setHeadings] = useState<Heading[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,16 +83,17 @@ export default function ArticleTOC({ hideWhenEmpty = false }: { hideWhenEmpty?: 
     if (headings.length === 0) return;
 
     const scrollRoot = document.getElementById("scroll-root");
-    if (!scrollRoot) return;
 
     const onScroll = () => {
-      const scrollRect = scrollRoot.getBoundingClientRect();
+      const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+      const useRoot = isDesktop && scrollRoot && scrollRoot.scrollHeight > scrollRoot.clientHeight;
+      const scrollRect = useRoot ? scrollRoot.getBoundingClientRect() : { top: 0 };
       let current = "";
       for (const h of headings) {
         const el = resolveHeadingElement(h);
         if (!el) continue;
         const rect = el.getBoundingClientRect();
-        const relativeTop = rect.top - scrollRect.top;
+        const relativeTop = useRoot ? rect.top - scrollRect.top : rect.top;
         if (relativeTop <= SPY_THRESHOLD) {
           current = h.id;
         }
@@ -94,31 +101,44 @@ export default function ArticleTOC({ hideWhenEmpty = false }: { hideWhenEmpty?: 
       setActiveId(current);
     };
 
-    scrollRoot.addEventListener("scroll", onScroll, { passive: true });
+    if (scrollRoot) scrollRoot.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
-    return () => scrollRoot.removeEventListener("scroll", onScroll);
+    return () => {
+      if (scrollRoot) scrollRoot.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll);
+    };
   }, [headings, resolveHeadingElement]);
 
   const handleClick = (e: React.MouseEvent, heading: Heading) => {
     e.preventDefault();
-    const scrollRoot = document.getElementById("scroll-root");
-    if (!scrollRoot) return;
-
     const targetEl = resolveHeadingElement(heading);
     if (!targetEl) return;
 
-    const scrollRect = scrollRoot.getBoundingClientRect();
-    const headingRect = targetEl.getBoundingClientRect();
-    const top = scrollRoot.scrollTop + (headingRect.top - scrollRect.top) - SCROLL_OFFSET;
-    scrollRoot.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+    const scrollRoot = document.getElementById("scroll-root");
+
+    if (isDesktop && scrollRoot && scrollRoot.scrollHeight > scrollRoot.clientHeight) {
+      const scrollRect = scrollRoot.getBoundingClientRect();
+      const headingRect = targetEl.getBoundingClientRect();
+      const top = scrollRoot.scrollTop + (headingRect.top - scrollRect.top) - SCROLL_OFFSET;
+      scrollRoot.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    } else {
+      const headingRect = targetEl.getBoundingClientRect();
+      const top = window.scrollY + headingRect.top - SCROLL_OFFSET;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }
     setActiveId(heading.id);
   };
+
+  const defaultAsideClass = "hidden lg:block lg:fixed lg:top-20 lg:right-[calc(50%+340px)] lg:w-[220px] xl:w-[260px]";
+  const asideClass = className || defaultAsideClass;
 
   if (headings.length === 0) {
     if (hideWhenEmpty) return null;
     return (
-      <aside className="hidden lg:block lg:fixed lg:top-6 lg:right-[calc(50%+324px)] lg:w-[220px] xl:w-[260px]">
-        <div className="rounded-2xl bg-wechat-white p-4 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)]">
+      <aside className={asideClass}>
+        <div className="rounded-2xl bg-wechat-white p-4 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)] border border-black/5 dark:border-white/5">
           <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-wechat-text">
             <List className="h-4 w-4 text-wechat-nickname" />
             章节目录
@@ -130,12 +150,12 @@ export default function ArticleTOC({ hideWhenEmpty = false }: { hideWhenEmpty?: 
   }
 
   return (
-    <aside className="hidden lg:block lg:fixed lg:top-6 lg:right-[calc(50%+324px)] lg:w-[220px] xl:w-[260px]">
+    <aside className={asideClass}>
       <div
         ref={containerRef}
-        className="no-scrollbar lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain"
+        className="no-scrollbar lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain"
       >
-        <div className="rounded-2xl bg-wechat-white p-4 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)]">
+        <div className="rounded-2xl bg-wechat-white p-4 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)] border border-black/5 dark:border-white/5">
           <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-wechat-text">
             <List className="h-4 w-4 text-wechat-nickname" />
             章节目录

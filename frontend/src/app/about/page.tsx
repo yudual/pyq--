@@ -1,38 +1,53 @@
 import type { Metadata } from "next";
-import { owner as fallbackOwner, type User } from "@/lib/mock-data";
+import { fetchOwner, fetchSiteSettings } from "@/lib/server-data";
 import { getApiUrl } from "@/lib/api-fetch";
 import AboutReader from "@/components/AboutReader";
 import SpecialPageLayout from "@/components/SpecialPageLayout";
+import type { User } from "@/lib/mock-data";
 
-const API_URL = getApiUrl();
 export const revalidate = 10;
 
-export const metadata: Metadata = { title: "关于" };
+async function getResolvedOwner(): Promise<User> {
+  const [owner, settings] = await Promise.all([fetchOwner(), fetchSiteSettings()]);
+  const nickname = owner.nickname || (typeof settings?.siteName === "string" ? settings.siteName : "") || "博主";
+  return {
+    ...owner,
+    nickname,
+  };
+}
 
-async function getOwner(): Promise<User> {
-  try {
-    const response = await fetch(`${API_URL}/users/owner`, { next: { revalidate } });
-    return response.ok ? await response.json() : fallbackOwner;
-  } catch {
-    return fallbackOwner;
-  }
+export async function generateMetadata(): Promise<Metadata> {
+  const owner = await getResolvedOwner();
+  return {
+    title: owner.nickname ? `关于 - ${owner.nickname}` : "关于",
+    description: "个人介绍与博客站点说明",
+  };
 }
 
 async function getAbout() {
   try {
-    const response = await fetch(`${API_URL}/pages/about`, { next: { revalidate } });
-    if (!response.ok) return { id: "", content: "", comments: [] };
-    return response.json();
+    const response = await fetch(`${getApiUrl()}/pages/about`, { next: { revalidate } });
+    if (!response.ok) return { id: "about", content: "", comments: [] };
+    const data = await response.json();
+    return {
+      id: data?.id || "about",
+      content: typeof data?.content === "string" ? data.content : "",
+      comments: Array.isArray(data?.comments) ? data.comments : [],
+    };
   } catch {
-    return { id: "", content: "", comments: [] };
+    return { id: "about", content: "", comments: [] };
   }
 }
 
 export default async function AboutPage() {
-  const [owner, page] = await Promise.all([getOwner(), getAbout()]);
+  const [owner, page, settings] = await Promise.all([
+    getResolvedOwner(),
+    getAbout(),
+    fetchSiteSettings(),
+  ]);
   return (
-    <SpecialPageLayout owner={owner} showToc>
-      <AboutReader page={page} />
+    <SpecialPageLayout owner={owner}>
+      <AboutReader page={page} owner={owner} siteSettings={settings} />
     </SpecialPageLayout>
   );
 }

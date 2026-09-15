@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Music, Pause, Play } from "lucide-react";
@@ -20,7 +21,9 @@ import ActionMenu from "@/components/ActionMenu";
 import CommentSection from "@/components/CommentSection";
 import LazyImage from "@/components/LazyImage";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { PUBLIC_API_URL } from "@/lib/api-fetch";
+
+const API_URL = PUBLIC_API_URL;
 
 interface PostDetailProps {
   post: Post;
@@ -70,6 +73,7 @@ export default function PostDetail({ post }: PostDetailProps) {
   const isThisActive = activePostId === post.id;
   const isThisPlaying = isThisActive && isPlaying;
   const isThisLoading = isThisActive && isLoading;
+  const normalizedImages = useMemo(() => normalizeImages(post.images), [post.images]);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -256,10 +260,8 @@ export default function PostDetail({ post }: PostDetailProps) {
     }
   };
 
-  const displayName = post.isAd ? post.adNickname || "广告" : post.author.nickname;
-  const authorAvatar = post.isAd
-    ? toAbsoluteUrl(post.adAvatar || "")
-    : resolveAvatar(post.author.avatar, post.author.email || "", 96);
+  const displayName = post.author.nickname;
+  const authorAvatar = resolveAvatar(post.author.avatar, post.author.email || "", 96);
 
   const musicInfo = post.music ? formatMusicInfo(post.music) : null;
 
@@ -297,7 +299,7 @@ export default function PostDetail({ post }: PostDetailProps) {
         {/* Images */}
         {!post.video && post.images && post.images.length > 0 && (
           <div className="mt-2">
-            <ImageGrid images={normalizeImages(post.images)} />
+            <ImageGrid images={normalizedImages} />
           </div>
         )}
 
@@ -396,11 +398,6 @@ export default function PostDetail({ post }: PostDetailProps) {
         <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-[13px] text-wechat-time md:text-[14px]">
             <time>{formatDetailTime(post.createdAt)}</time>
-            {post.isAd && (
-              <span className="rounded-[4px] bg-[#ececec] px-2 py-0.5 text-[11px] font-medium text-[#9a9a9a] dark:bg-white/[0.1]">
-                广告
-              </span>
-            )}
             {(() => {
               const src = getPostSourceLabel(post);
               if (!src) return null;
@@ -416,7 +413,7 @@ export default function PostDetail({ post }: PostDetailProps) {
             onLike={post.likesDisabled ? undefined : handleLike}
             onComment={post.commentsDisabled ? undefined : handleCommentClick}
             onEdit={canEdit ? () => openEdit(post) : undefined}
-            onPin={isAdmin && !post.isAd ? handlePin : undefined}
+            onPin={isAdmin ? handlePin : undefined}
             liked={liked}
             pinned={pinned}
           />

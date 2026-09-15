@@ -42,7 +42,9 @@ interface SiteSettings {
   socialLinks: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { PUBLIC_API_URL } from "@/lib/api-fetch";
+
+const API_URL = PUBLIC_API_URL;
 
 interface SidebarProps {
   owner: UserType;

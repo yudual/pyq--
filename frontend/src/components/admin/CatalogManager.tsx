@@ -251,5 +251,134 @@ function EditItem({ collection, data, setData, onSave, onClose, onPick, saving }
       setUploading(false);
     }
   };
-  return <div className="mb-4 rounded-xl border border-adm-border bg-adm-card p-4"><div className="mb-3 flex justify-between"><h2 className="font-semibold text-adm-text">{data.id ? "编辑卡片" : "添加卡片"}</h2><button type="button" onClick={onClose}><X className="h-4 w-4" /></button></div><div className="grid gap-4 md:grid-cols-[150px_1fr]"><div className="space-y-2"><div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-dashed border-adm-border bg-white">{data.imageUrl ? <img src={toAbsoluteUrl(data.imageUrl)} alt="预览" className="h-full w-full object-contain" /> : <ImageIcon className="h-6 w-6 text-adm-text-tertiary" />}</div><button type="button" onClick={() => setData({ ...data, imageMediaId: null, imageUrl: "" })} disabled={!data.imageUrl} className="w-full rounded-lg py-1 text-xs text-adm-text-tertiary hover:bg-adm-card-hover disabled:opacity-40">清除图片</button></div><div className="space-y-3"><input value={data.title} onChange={(e) => setData({ ...data, title: e.target.value })} placeholder={isLabs ? "项目名称" : "设备名称"} className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm" /><input value={data.configuration} onChange={(e) => setData({ ...data, configuration: e.target.value })} placeholder="配置 / 副标题" className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm" />{isLabs && <input type="url" value={data.linkUrl} onChange={(e) => setData({ ...data, linkUrl: e.target.value })} placeholder="项目链接（https://，选填）" className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm" />}<textarea value={data.description} onChange={(e) => setData({ ...data, description: e.target.value })} placeholder="2~3 行简介" className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm" rows={3} /><div className="space-y-2 rounded-xl border border-adm-border p-3"><input value={data.imageMediaId ? "" : data.imageUrl} onChange={(e) => setData({ ...data, imageMediaId: null, imageUrl: e.target.value })} placeholder="输入 HTTPS 图片 URL 或上传" className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm" /><div className="flex flex-wrap gap-2"><button type="button" onClick={() => inputRef.current?.click()} disabled={uploading} className="flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-xs text-adm-text-secondary hover:bg-adm-card-hover disabled:opacity-50"><Upload className="h-3.5 w-3.5" />{uploading ? "上传中..." : "上传图片"}</button><button type="button" onClick={onPick} className="flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-xs text-adm-text-secondary hover:bg-adm-card-hover"><Library className="h-3.5 w-3.5" />媒体库</button></div><input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleUpload(file); e.target.value = ""; }} /></div><button type="button" onClick={onSave} disabled={saving} className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white dark:bg-white dark:text-gray-900">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}保存</button></div></div></div>;
+  return (
+    <div className="mb-4 rounded-xl border border-adm-border bg-adm-card p-4">
+      <div className="mb-3 flex justify-between">
+        <h2 className="font-semibold text-adm-text">{data.id ? "编辑卡片" : "添加卡片"}</h2>
+        <button type="button" onClick={onClose}><X className="h-4 w-4" /></button>
+      </div>
+      <div className="grid gap-4 md:grid-cols-[150px_1fr]">
+        <div className="space-y-2">
+          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-dashed border-adm-border bg-white">
+            {data.imageUrl ? (
+              <img src={toAbsoluteUrl(data.imageUrl)} alt="预览" className="h-full w-full object-contain" />
+            ) : (
+              <ImageIcon className="h-6 w-6 text-adm-text-tertiary" />
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setData({ ...data, imageMediaId: null, imageUrl: "" })}
+            disabled={!data.imageUrl}
+            className="w-full rounded-lg py-1 text-xs text-adm-text-tertiary hover:bg-adm-card-hover disabled:opacity-40"
+          >
+            清除图片
+          </button>
+        </div>
+        <div className="space-y-3">
+          <input
+            value={data.title}
+            onChange={(e) => setData({ ...data, title: e.target.value })}
+            placeholder={isLabs ? "项目名称" : "设备名称"}
+            className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm"
+          />
+          <input
+            value={data.configuration}
+            onChange={(e) => setData({ ...data, configuration: e.target.value })}
+            placeholder="配置 / 副标题"
+            className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm"
+          />
+          {isLabs && (
+            <input
+              type="url"
+              value={data.linkUrl}
+              onChange={(e) => setData({ ...data, linkUrl: e.target.value })}
+              placeholder="项目链接（https://，选填）"
+              className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm"
+            />
+          )}
+          <textarea
+            value={data.description}
+            onChange={(e) => setData({ ...data, description: e.target.value })}
+            placeholder="2~3 行简介"
+            className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm"
+            rows={3}
+          />
+          <div className="space-y-2 rounded-xl border border-adm-border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-adm-text-secondary">卡片图片（外链/上传）</span>
+              {data.imageUrl && (
+                <div className="flex items-center gap-2 text-xs">
+                  <a
+                    href={toAbsoluteUrl(data.imageUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-adm-primary hover:underline"
+                  >
+                    新窗口查看
+                  </a>
+                  <span className="text-adm-text-tertiary">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setData({ ...data, imageMediaId: null, imageUrl: "" })}
+                    className="text-rose-500 hover:underline"
+                  >
+                    清除
+                  </button>
+                </div>
+              )}
+            </div>
+            <input
+              value={data.imageUrl || ""}
+              onChange={(e) => setData({ ...data, imageMediaId: null, imageUrl: e.target.value })}
+              placeholder="粘贴自有图床图片 URL，或点击下方上传"
+              className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-xs text-adm-text-secondary hover:bg-adm-card-hover disabled:opacity-50"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                {uploading ? "上传中..." : "上传本地图片"}
+              </button>
+              <button
+                type="button"
+                onClick={onPick}
+                className="flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-xs text-adm-text-secondary hover:bg-adm-card-hover"
+              >
+                <Library className="h-3.5 w-3.5" />
+                媒体素材库
+              </button>
+            </div>
+            <p className="text-[11px] leading-relaxed text-adm-text-tertiary">
+              支持直接粘贴自有图床图片外链；若已配置 R2，也可直接选择本地文件上传。
+            </p>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleUpload(file);
+                e.target.value = "";
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white dark:bg-white dark:text-gray-900"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

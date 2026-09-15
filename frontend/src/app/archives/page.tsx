@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import CoverHeader from "@/components/CoverHeader";
 import DesktopDecorations from "@/components/DesktopDecorations";
-import ProfileTopBar from "@/components/profile/ProfileTopBar";
-import Sidebar from "@/components/Sidebar";
 import FloatingActions from "@/components/FloatingActions";
 import Footer from "@/components/Footer";
 import DesktopFooter from "@/components/DesktopFooter";
@@ -10,63 +8,18 @@ import EditPostModal from "@/components/EditPostModal";
 import ProfileTimeline from "@/components/profile/ProfileTimeline";
 import ProfileFadeIn from "@/components/profile/ProfileFadeIn";
 import ProfileScrollRestoration from "@/components/profile/ProfileScrollRestoration";
-import { owner as fallbackOwner, User } from "@/lib/mock-data";
-import { getApiUrl } from "@/lib/api-fetch";
-
-const API_URL = getApiUrl();
-const PAGE_SIZE = 10;
+import { fetchOwner, fetchPostsPage, fetchSiteSettings } from "@/lib/server-data";
 
 export const revalidate = 10;
 
 export async function generateMetadata(): Promise<Metadata> {
-  try {
-    const res = await fetch(`${API_URL}/users/owner`, { next: { revalidate: 10 } });
-    const owner: User = res.ok ? await res.json() : fallbackOwner;
-    return {
-      title: `${owner.nickname} 的归档`,
-    };
-  } catch {
-    return {
-      title: "归档",
-    };
-  }
+  const owner = await fetchOwner();
+  return {
+    title: owner.nickname ? `${owner.nickname} 的归档` : "归档",
+  };
 }
 
-async function getOwner(): Promise<User> {
-  try {
-    const res = await fetch(`${API_URL}/users/owner`, { next: { revalidate: 10 } });
-    if (!res.ok) return fallbackOwner;
-    return await res.json();
-  } catch {
-    return fallbackOwner;
-  }
-}
-
-async function getOwnerPosts(ownerId: string) {
-  try {
-    const res = await fetch(
-      `${API_URL}/posts?userId=${ownerId}&page=1&limit=${PAGE_SIZE}`,
-      { next: { revalidate: 10 } }
-    );
-    if (!res.ok) return { data: [], hasMore: false };
-    const json = await res.json();
-    return { data: json.data || [], hasMore: json.pagination?.hasMore ?? false };
-  } catch {
-    return { data: [], hasMore: false };
-  }
-}
-
-async function getSettings() {
-  try {
-    const res = await fetch(`${API_URL}/settings`, { next: { revalidate: 10 } });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-function getCoverList(settings: any, fallback: string): string[] {
+function getCoverList(settings: Record<string, unknown> | null | undefined, fallback: string): string[] {
   const raw = settings?.backgroundImages;
   if (!raw) return [fallback];
   try {
@@ -81,39 +34,32 @@ function getCoverList(settings: any, fallback: string): string[] {
 }
 
 export default async function ProfilePage() {
-  const owner = await getOwner();
+  const owner = await fetchOwner();
   const [postsData, settings] = await Promise.all([
-    getOwnerPosts(owner.id),
-    getSettings(),
+    fetchPostsPage(`userId=${encodeURIComponent(owner.id)}&page=1&limit=10`),
+    fetchSiteSettings(),
   ]);
   const coverUrls = getCoverList(settings, owner.cover);
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg">
+    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
-      <div className="md:pt-6">
-        <div
-          id="scroll-root"
-          className="md:fixed md:top-6 md:left-[calc(50%-300px)] md:z-10 md:h-[calc(100vh-48px)] md:w-[600px] md:overflow-y-auto md:rounded-2xl md:bg-wechat-white md:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] dark:md:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          <ProfileTopBar coverHeight={300} />
-          <main className="relative w-full bg-wechat-white pb-8 md:pb-12">
-            <ProfileFadeIn>
-              <CoverHeader user={owner} coverUrls={coverUrls} />
+      <div className="relative mx-auto w-full max-w-[640px] md:max-w-2xl lg:max-w-3xl px-3 sm:px-4 pt-20 sm:pt-24 pb-16">
+        <main className="relative w-full overflow-hidden rounded-3xl bg-wechat-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] border border-neutral-200/60 dark:border-neutral-800/80 pb-8 md:pb-12">
+          <ProfileFadeIn>
+            <CoverHeader user={owner} coverUrls={coverUrls} />
 
-              <ProfileTimeline
-                initialPosts={postsData.data}
-                initialHasMore={postsData.hasMore}
-                initialPage={1}
-                ownerId={owner.id}
-              />
-              <Footer />
-            </ProfileFadeIn>
-          </main>
-        </div>
-
-        <Sidebar owner={owner} />
+            <ProfileTimeline
+              initialPosts={postsData.data}
+              initialHasMore={postsData.hasMore}
+              initialPage={1}
+              initialError={postsData.error}
+              ownerId={owner.id}
+            />
+            <Footer />
+          </ProfileFadeIn>
+        </main>
       </div>
 
       <FloatingActions />

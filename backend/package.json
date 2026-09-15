@@ -16,6 +16,7 @@
     "db:migrate-content-pages": "ts-node src/scripts/migrate-content-pages.ts",
     "db:migrate-catalog-item-fields": "ts-node src/scripts/migrate-catalog-item-fields.ts",
     "db:migrate-r2-music-fields": "ts-node src/scripts/migrate-r2-music-fields.ts",
+    "db:remove-ads": "ts-node src/scripts/migrate-remove-ads.ts",
     "music:migrate-r2": "ts-node src/scripts/migrate-r2-music.ts"
   },
   "keywords": [],

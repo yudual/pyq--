@@ -8,7 +8,9 @@ import { getCurrentUser, CurrentUser, authFetchHeaders } from "@/lib/auth";
 import { X, Smile, ChevronDown, ChevronUp } from "lucide-react";
 import { EMOJI_LIST, editableToShortcode } from "@/lib/emoji";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { PUBLIC_API_URL } from "@/lib/api-fetch";
+
+const API_URL = PUBLIC_API_URL;
 
 interface CommentSectionProps {
   postId: string;

@@ -37,7 +37,6 @@
   --single-img-max: 280px;
   --single-img-height: 240px;
 }
-
 @media (min-width: 768px) {
   :root {
     --single-img-max: 320px;
@@ -187,6 +186,34 @@ body::-webkit-scrollbar {
 
 .animate-fade-in-up {
   animation: fade-in-up 0.3s ease-out forwards;
+}
+
+@keyframes hero-glow {
+  0%, 100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.18) translate(1%, 2%);
+    opacity: 0.65;
+  }
+}
+
+.animate-hero-glow {
+  animation: hero-glow 10s ease-in-out infinite;
+}
+
+@keyframes bounce-gentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+.animate-bounce-gentle {
+  animation: bounce-gentle 2.2s ease-in-out infinite;
 }
 
 /* ── Profile page fade transition ──
@@ -743,6 +770,93 @@ img.inline-emoji.emoji-error {
   margin-bottom: 0 !important;
 }
 
+/* ── 深度长文博客阅读器专属排版增强 ── */
+.article-content.rich-content {
+  font-size: 1.0625rem;
+  line-height: 1.9;
+  letter-spacing: 0.01em;
+  word-break: break-word;
+}
+@media (min-width: 640px) {
+  .article-content.rich-content {
+    font-size: 1.125rem;
+  }
+}
+.article-content.rich-content h1 {
+  font-size: 1.75em;
+  font-weight: 800;
+  margin: 1.8em 0 0.6em;
+  line-height: 1.3;
+  color: inherit;
+}
+.article-content.rich-content h2 {
+  font-size: 1.45em;
+  font-weight: 700;
+  margin: 1.6em 0 0.5em;
+  line-height: 1.35;
+  padding-bottom: 0.35em;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.dark .article-content.rich-content h2 {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+.article-content.rich-content h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 1.4em 0 0.4em;
+  line-height: 1.4;
+}
+.article-content.rich-content p {
+  margin: 1.15em 0;
+  line-height: 1.85;
+}
+.article-content.rich-content blockquote {
+  border-left: 4px solid #10b981;
+  padding: 0.8em 1.2em;
+  margin: 1.4em 0;
+  background: rgba(16, 185, 129, 0.05);
+  border-radius: 0 8px 8px 0;
+  font-style: normal;
+  color: inherit;
+}
+.dark .article-content.rich-content blockquote {
+  background: rgba(16, 185, 129, 0.08);
+}
+.article-content.rich-content ul,
+.article-content.rich-content ol {
+  margin: 1.1em 0;
+  padding-left: 1.6em;
+}
+.article-content.rich-content li {
+  margin: 0.4em 0;
+  line-height: 1.75;
+}
+.article-content.rich-content table {
+  margin: 1.6em 0;
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+  border-collapse: collapse;
+}
+.article-content.rich-content th,
+.article-content.rich-content td {
+  padding: 0.6em 1em;
+}
+.article-content.rich-content th {
+  background: rgba(0, 0, 0, 0.03);
+  font-weight: 600;
+}
+.dark .article-content.rich-content th {
+  background: rgba(255, 255, 255, 0.05);
+}
+.article-content.rich-content hr {
+  margin: 2.2em 0;
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+.dark .article-content.rich-content hr {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
 /* ===== Article editor — 仿微信公众号编辑器排版 ===== */
 
 /* Editor placeholder */
@@ -752,67 +866,76 @@ img.inline-emoji.emoji-error {
   pointer-events: none;
 }
 
-/* Article typography — larger headings, generous spacing (WeChat style) */
+/* Article typography — blog reading layout with clear hierarchy */
 .article-content {
   overflow-wrap: break-word;
   word-break: break-word;
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
 }
 .article-editor-area h1,
 .article-content h1 {
-  font-size: 1.6em;
-  font-weight: 700;
-  margin: 1.2em 0 0.5em;
-  line-height: 1.35;
+  font-size: 1.85em;
+  font-weight: 800;
+  margin: 1.6em 0 0.6em;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
 }
 .article-editor-area h2,
 .article-content h2 {
-  font-size: 1.4em;
+  font-size: 1.5em;
   font-weight: 700;
-  margin: 1em 0 0.4em;
+  margin: 1.5em 0 0.5em;
   line-height: 1.35;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.dark .article-content h2 {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 .article-editor-area h3,
 .article-content h3 {
-  font-size: 1.2em;
+  font-size: 1.25em;
   font-weight: 600;
-  margin: 0.8em 0 0.3em;
-  line-height: 1.35;
+  margin: 1.2em 0 0.4em;
+  line-height: 1.4;
 }
 .article-editor-area p,
 .article-content p {
-  margin: 0.6em 0;
-  line-height: 1.8;
+  margin: 1em 0;
+  line-height: 1.85;
 }
 .article-editor-area ul,
 .article-content ul {
   list-style: disc;
   padding-left: 1.8em;
-  margin: 0.6em 0;
+  margin: 0.8em 0;
 }
 .article-editor-area ol,
 .article-content ol {
   list-style: decimal;
   padding-left: 1.8em;
-  margin: 0.6em 0;
+  margin: 0.8em 0;
 }
 .article-editor-area li,
 .article-content li {
-  margin: 0.25em 0;
-  line-height: 1.7;
+  margin: 0.35em 0;
+  line-height: 1.75;
 }
 .article-editor-area blockquote,
 .article-content blockquote {
-  border-left: 3px solid var(--wechat-nickname);
-  padding: 0.4em 1em;
-  margin: 0.8em 0;
-  color: var(--wechat-time);
-  font-style: italic;
-  background: var(--wechat-bubble);
-  border-radius: 0 4px 4px 0;
+  border-left: 4px solid #10b981;
+  padding: 0.6em 1.2em;
+  margin: 1.2em 0;
+  color: inherit;
+  opacity: 0.9;
+  background: rgba(16, 185, 129, 0.05);
+  border-radius: 0 8px 8px 0;
 }
 .dark .article-editor-area blockquote,
 .dark .article-content blockquote {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(16, 185, 129, 0.08);
+  border-left-color: #059669;
 }
 .article-editor-area mark,
 .article-content mark {
@@ -828,9 +951,11 @@ img.inline-emoji.emoji-error {
 .article-content a:hover {
   text-decoration: underline;
 }
-/* ── 内联代码：红色文字（主流代码高亮风格）── */
-.article-editor-area code,
-.article-content code {
+/* ── 内联代码：红色文字（主流代码高亮风格），严格排除 pre 内部代码块 ── */
+.article-editor-area :not(pre) > code,
+.article-content :not(pre) > code,
+.rich-editor-area :not(pre) > code,
+.rich-content :not(pre) > code {
   background: rgba(239, 68, 68, 0.08);
   color: #e83a3a;
   padding: 0.15em 0.35em;
@@ -839,22 +964,27 @@ img.inline-emoji.emoji-error {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   word-break: break-all;
 }
-.dark .article-editor-area code,
-.dark .article-content code,
-.dark .rich-editor-area code,
-.dark .rich-content code {
+.dark .article-editor-area :not(pre) > code,
+.dark .article-content :not(pre) > code,
+.dark .rich-editor-area :not(pre) > code,
+.dark .rich-content :not(pre) > code {
   background: rgba(239, 68, 68, 0.15) !important;
   color: #ff6b6b !important;
 }
-/* pre 内的 code 不受内联红色影响 */
+/* pre 内的代码块：彻底隔离内联样式，交由 highlight.js 自由着色 */
 .article-editor-area pre code,
-.article-content pre code {
-  background: transparent;
-  color: inherit;
-  padding: 0;
-  font-size: 0.875em;
-  line-height: 1.6;
-  word-break: normal;
+.article-content pre code,
+.dark .article-editor-area pre code,
+.dark .article-content pre code,
+.macos-enhanced-code code,
+.dark .macos-enhanced-code code {
+  background: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  line-height: 1.6 !important;
+  word-break: normal !important;
+  white-space: pre !important;
 }
 
 /* ── macOS 风格代码块 ── */
@@ -1156,9 +1286,9 @@ img.inline-emoji.emoji-error {
 .article-content table {
   border-collapse: collapse;
   width: 100%;
-  max-width: 100%;
+  min-width: 100%;
   margin: 0;
-  table-layout: fixed;
+  table-layout: auto;
 }
 .article-editor-area th,
 .article-content th,
@@ -1855,4 +1985,276 @@ img.inline-emoji.emoji-error {
   font-size: 11px;
   color: var(--wechat-time, #999);
   line-height: 1.3;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Highlight.js 核心语法高亮配色（GitHub Light / Tokyo Night Dark 顶级配色方案）
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.hljs {
+  color: #24292f;
+}
+.dark .hljs {
+  color: #c9d1d9;
+}
+
+/* 关键字、选择器、内置类型 */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: #cf222e;
+  font-weight: 600;
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-built_in,
+.dark .hljs-name,
+.dark .hljs-tag {
+  color: #ff7b72;
+  font-weight: 600;
+}
+
+/* 字符串、属性值、高亮追加 */
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition {
+  color: #0a3069;
+}
+.dark .hljs-string,
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-attribute,
+.dark .hljs-literal,
+.dark .hljs-template-tag,
+.dark .hljs-template-variable,
+.dark .hljs-type,
+.dark .hljs-addition {
+  color: #a5d6ff;
+}
+
+/* 注释、引用块 */
+.hljs-comment,
+.hljs-quote,
+.hljs-meta {
+  color: #6e7781;
+  font-style: italic;
+}
+.dark .hljs-comment,
+.dark .hljs-quote,
+.dark .hljs-meta {
+  color: #8b949e;
+  font-style: italic;
+}
+
+/* 数字、链接、正则 */
+.hljs-number,
+.hljs-regexp,
+.hljs-link {
+  color: #0550ae;
+}
+.dark .hljs-number,
+.dark .hljs-regexp,
+.dark .hljs-link {
+  color: #79c0ff;
+}
+
+/* 变量、参数 */
+.hljs-variable,
+.hljs-params {
+  color: #953800;
+}
+.dark .hljs-variable,
+.dark .hljs-params {
+  color: #ffa657;
+}
+
+/* 标点、符号 */
+.hljs-symbol,
+.hljs-bullet {
+  color: #116329;
+}
+.dark .hljs-symbol,
+.dark .hljs-bullet {
+  color: #7ee787;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: bold;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Markdown Callout / Admonitions 提示卡片（GitHub / VitePress / Vdoing 规范）
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.markdown-callout {
+  margin: 1.25em 0;
+  padding: 0.9em 1.2em;
+  border-left: 4px solid;
+  border-radius: 0 10px 10px 0;
+  font-size: 0.95em;
+  line-height: 1.65;
+  transition: all 0.2s ease;
+}
+.markdown-callout-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-weight: 700;
+  margin-bottom: 0.4em;
+  text-transform: uppercase;
+  font-size: 0.8em;
+  letter-spacing: 0.05em;
+}
+.markdown-callout-body {
+  font-size: 0.95em;
+}
+.markdown-callout-body > p:last-child {
+  margin-bottom: 0;
+}
+
+/* NOTE (蓝) */
+.markdown-callout.note {
+  background: rgba(59, 130, 246, 0.06);
+  border-color: #3b82f6;
+  color: #1e40af;
+}
+.dark .markdown-callout.note {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: #60a5fa;
+  color: #bfdbfe;
+}
+.markdown-callout.note .markdown-callout-title {
+  color: #2563eb;
+}
+.dark .markdown-callout.note .markdown-callout-title {
+  color: #60a5fa;
+}
+
+/* TIP (绿) */
+.markdown-callout.tip {
+  background: rgba(16, 185, 129, 0.06);
+  border-color: #10b981;
+  color: #065f46;
+}
+.dark .markdown-callout.tip {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #34d399;
+  color: #a7f3d0;
+}
+.markdown-callout.tip .markdown-callout-title {
+  color: #059669;
+}
+.dark .markdown-callout.tip .markdown-callout-title {
+  color: #34d399;
+}
+
+/* IMPORTANT (紫) */
+.markdown-callout.important {
+  background: rgba(139, 92, 246, 0.06);
+  border-color: #8b5cf6;
+  color: #5b21b6;
+}
+.dark .markdown-callout.important {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: #a78bfa;
+  color: #ddd6fe;
+}
+.markdown-callout.important .markdown-callout-title {
+  color: #7c3aed;
+}
+.dark .markdown-callout.important .markdown-callout-title {
+  color: #a78bfa;
+}
+
+/* WARNING (黄/橙) */
+.markdown-callout.warning {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: #f59e0b;
+  color: #92400e;
+}
+.dark .markdown-callout.warning {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: #fbbf24;
+  color: #fde68a;
+}
+.markdown-callout.warning .markdown-callout-title {
+  color: #d97706;
+}
+.dark .markdown-callout.warning .markdown-callout-title {
+  color: #fbbf24;
+}
+
+/* CAUTION (红) */
+.markdown-callout.caution {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: #ef4444;
+  color: #991b1b;
+}
+.dark .markdown-callout.caution {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #f87171;
+  color: #fecaca;
+}
+.markdown-callout.caution .markdown-callout-title {
+  color: #dc2626;
+}
+.dark .markdown-callout.caution .markdown-callout-title {
+  color: #f87171;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   GFM 规范扩展排版：任务列表 (Task Lists)、表格包裹器
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.rich-content ul:has(input[type="checkbox"]),
+.article-content ul:has(input[type="checkbox"]) {
+  list-style: none !important;
+  padding-left: 0.4em !important;
+}
+.rich-content input[type="checkbox"],
+.article-content input[type="checkbox"] {
+  margin-right: 0.5em;
+  accent-color: #10b981;
+  width: 15px;
+  height: 15px;
+  vertical-align: middle;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Markdown 编辑器与分栏实时预览：细腻高质感滚动条
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.editor-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.35) transparent;
+}
+.editor-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.editor-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.editor-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.35);
+  border-radius: 9999px;
+}
+.editor-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.6);
+}
+.dark .editor-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+.dark .editor-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+.dark .editor-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.4);
 }

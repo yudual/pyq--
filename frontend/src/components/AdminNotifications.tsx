@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,7 +13,9 @@ import { useSiteSettings } from "@/lib/site-settings-store";
 import { renderTextWithEmoji } from "@/lib/emoji";
 import FadeImage from "@/components/FadeImage";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { PUBLIC_API_URL } from "@/lib/api-fetch";
+
+const API_URL = PUBLIC_API_URL;
 
 interface NotificationItem {
   id: string;
@@ -255,9 +258,9 @@ export default function AdminNotifications({ variant = "mobile" }: AdminNotifica
     if (variant === "mobile") {
       setOpen(false);
     }
-    // 文章通知跳转 /articles/{postId}，动态通知跳转 /moments/{shortId}
+    // 文章通知跳转 /articles/{shortId || postId}，动态通知跳转 /moments/{shortId || postId}
     const path = isArticle
-      ? `/articles/${postId}`
+      ? `/articles/${shortId || postId}`
       : `/moments/${shortId || postId}`;
     router.push(`${path}${commentId ? `#comment-${commentId}` : ""}`);
   };

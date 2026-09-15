@@ -1,0 +1,65 @@
+import type { Metadata } from "next";
+import ChannelHeader from "@/components/channel/ChannelHeader";
+import PostList from "@/components/PostList";
+import Footer from "@/components/Footer";
+import FloatingActions from "@/components/FloatingActions";
+import DesktopFooter from "@/components/DesktopFooter";
+import EditPostModal from "@/components/EditPostModal";
+import DesktopDecorations from "@/components/DesktopDecorations";
+import { fetchPostsPage } from "@/lib/server-data";
+
+export const revalidate = 10;
+
+export const metadata: Metadata = {
+  title: "文章 - 个人博客",
+  description: "深度博文、技术思考与随笔写作",
+};
+
+async function getArticles() {
+  try {
+    const result = await fetchPostsPage("page=1&limit=10&type=article");
+    const data = result.data.filter((p) => p.category !== "项目");
+    return { ...result, data };
+  } catch {
+    return { data: [], hasMore: false, total: 0, error: true };
+  }
+}
+
+export default async function ArticlesPage() {
+  const articlesData = await getArticles();
+
+  return (
+    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
+      <DesktopDecorations />
+
+      {/* 栏目头部 */}
+      <ChannelHeader
+        title="文章"
+        subtitle="深度长文、技术思考与随笔写作"
+        icon="✍️"
+        count={articlesData.total}
+        maxWidth="max-w-4xl lg:max-w-5xl"
+      />
+
+      {/* 博客化文章列表主体 */}
+      <div className="relative mx-auto w-full max-w-4xl lg:max-w-5xl px-4 sm:px-6 pb-20">
+        <main className="relative w-full">
+          <PostList
+            initialPosts={articlesData.data}
+            initialHasMore={articlesData.hasMore}
+            initialPage={1}
+            initialError={articlesData.error}
+            type="article"
+          />
+          <div className="mt-12">
+            <Footer />
+          </div>
+        </main>
+      </div>
+
+      <FloatingActions />
+      <DesktopFooter />
+      <EditPostModal />
+    </div>
+  );
+}

@@ -131,7 +131,7 @@ export default function CoverHeader({ user, avatarHref, coverUrls }: CoverHeader
 
         {/* Nickname + avatar row crossing the cover/body boundary like WeChat.
             z-10 keeps the avatar above the bio section that follows. */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 mx-auto max-w-[600px] px-4 sm:px-5 md:px-6">
+        <div className="absolute bottom-0 left-0 right-0 z-10 w-full px-4 sm:px-5 md:px-6">
           <div className="flex items-end justify-end gap-3 pb-1">
             {avatarHref ? (
               <Link
@@ -149,7 +149,7 @@ export default function CoverHeader({ user, avatarHref, coverUrls }: CoverHeader
                     fill
                     className="object-cover"
                     sizes="88px"
-                    unoptimized={avatarSrc.endsWith(".svg")}
+                    unoptimized
                   />
                 </div>
               </Link>
@@ -175,7 +175,7 @@ export default function CoverHeader({ user, avatarHref, coverUrls }: CoverHeader
       </div>
 
       {/* Bio - sits just below the avatar that extends into the body */}
-      <div className="mx-auto flex max-w-[600px] justify-end px-4 pb-2 pt-6 text-xs text-wechat-time sm:px-5 sm:pt-7 md:px-6 md:pb-3 md:pt-8">
+      <div className="flex w-full justify-end px-4 pb-2 pt-6 text-xs text-wechat-time sm:px-5 sm:pt-7 md:px-6 md:pb-3 md:pt-8">
         <span className="max-w-[80%] truncate text-right">{user.bio}</span>
       </div>
     </header>

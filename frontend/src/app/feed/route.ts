@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUrl } from "@/lib/api-fetch";
+import { stripMarkdownAndHtml } from "@/lib/frontmatter";
 
 const API_URL = getApiUrl();
 
@@ -14,13 +15,7 @@ function escapeXml(str: string): string {
 }
 
 function stripHtml(html: string): string {
-  return html
-    .replace(/<div\s+[^>]*data-embed="[^"]*"[^>]*>[\s\S]*?<\/div>/gi, "")
-    .replace(/<a\s+[^>]*class="[^"]*link-card[^"]*"[^>]*>[\s\S]*?<\/a>/gi, "")
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return stripMarkdownAndHtml(html);
 }
 
 /** 截断文本，超长时加省略号 */
@@ -79,13 +74,19 @@ function generateTitle(post: any): string {
 
 /** 生成摘要：有文字取前 200 字符（超长加省略号），纯媒体用自动标题 */
 function generateExcerpt(post: any): string {
-  const fullText = stripHtml(post.content || "");
-  if (post.excerpt) {
-    // excerpt 可能已被截断（无省略号），若原文更长则补上
-    if (fullText && fullText.length > post.excerpt.length) {
-      return post.excerpt + "...";
+  let fullText = stripHtml(post.content || "");
+  if (post.title && fullText.startsWith(post.title.trim())) {
+    fullText = fullText.slice(post.title.trim().length).trim();
+  }
+  const rawExcerpt = (post.excerpt || "").trim();
+  const cleanExcerpt = rawExcerpt ? stripHtml(rawExcerpt) : "";
+  const isJunkExcerpt = !cleanExcerpt || /^---\s*(?:title|category|tags|articleType):/i.test(rawExcerpt);
+
+  if (!isJunkExcerpt && cleanExcerpt) {
+    if (fullText && fullText.length > cleanExcerpt.length) {
+      return cleanExcerpt + "...";
     }
-    return post.excerpt;
+    return cleanExcerpt;
   }
   if (fullText) return truncate(fullText, 200);
   return generateTitle(post);
@@ -125,11 +126,14 @@ export async function GET() {
     let items = "";
     if (postsRes.ok) {
       const data = await postsRes.json();
-      const posts = data.data || [];
+      const rawPosts = data.data || [];
+      const posts = rawPosts.filter((post: any) => (post.status ? post.status === "published" : true));
       items = posts
         .map((post: any) => {
           const title = generateTitle(post);
-          const link = post.type === "article"
+          const link = post.category === "项目" || post.type === "project"
+            ? `${domain}/projects/${post.shortId || post.id}`
+            : post.type === "article"
             ? `${domain}/articles/${post.shortId || post.id}`
             : `${domain}/moments/${post.shortId || post.id}`;
           const excerpt = generateExcerpt(post);

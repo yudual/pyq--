@@ -20,6 +20,7 @@ export function PostCardSkeleton({ className = "" }: { className?: string }) {
   );
 }
 
+
 export function PostListSkeleton({ count = 3 }: { count?: number }) {
   return (
     <div className="divide-hairline">
@@ -49,6 +50,32 @@ export function CommentListSkeleton({ count = 4 }: { count?: number }) {
       {Array.from({ length: count }).map((_, i) => (
         <CommentRowSkeleton key={i} />
       ))}
+    </div>
+  );
+}
+
+export function ArticleCardSkeleton({ className = "" }: { className?: string }) {
+  return (
+    <div className={`overflow-hidden rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-white dark:bg-neutral-900/70 p-5 sm:p-7 shadow-xs ${className}`}>
+      <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 items-start justify-between">
+        <div className="min-w-0 flex-1 space-y-3.5 w-full">
+          <div className="flex items-center gap-2">
+            <div className={`h-4 w-16 ${BLOCK}`} />
+            <div className={`h-4 w-12 ${BLOCK}`} />
+            <div className={`h-4 w-24 ${BLOCK}`} />
+          </div>
+          <div className={`h-6 w-3/4 ${BLOCK}`} />
+          <div className="space-y-2">
+            <div className={`h-4 w-full ${BLOCK}`} />
+            <div className={`h-4 w-5/6 ${BLOCK}`} />
+          </div>
+          <div className="pt-3 border-t border-black/[0.04] dark:border-white/[0.05] flex items-center justify-between">
+            <div className={`h-3 w-32 ${BLOCK}`} />
+            <div className={`h-3 w-16 ${BLOCK}`} />
+          </div>
+        </div>
+        <div className={`hidden sm:block sm:w-44 md:w-52 aspect-[16/10] sm:aspect-[4/3] shrink-0 rounded-xl ${BLOCK}`} />
+      </div>
     </div>
   );
 }

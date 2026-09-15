@@ -20,7 +20,6 @@ import {
   Moon,
   Type,
   Library,
-  Megaphone,
   Rss,
 } from "lucide-react";
 import { uploadImage, toAbsoluteUrl } from "@/lib/upload";
@@ -49,7 +48,6 @@ interface SiteSettings {
   darkModeEndTime: string;
   fontUrl: string;
   fontFamily: string;
-  adOnArchives: boolean;
   rssEnabled: boolean;
   rssIncludeMoments: boolean;
   doubanId: string;
@@ -73,7 +71,6 @@ const DEFAULTS: SiteSettings = {
   darkModeEndTime: "06:00",
   fontUrl: "",
   fontFamily: "",
-  adOnArchives: false,
   rssEnabled: true,
   rssIncludeMoments: true,
   doubanId: "",
@@ -219,12 +216,14 @@ function ImageField({
   onChange,
   token,
   previewClass,
+  hint,
 }: {
   label: string;
   url: string;
   onChange: (url: string) => void;
   token: string;
   previewClass: string;
+  hint?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -244,9 +243,31 @@ function ImageField({
 
   return (
     <div className="mb-5">
-      <label className="mb-1.5 block text-xs font-medium text-adm-text-secondary">
-        {label}
-      </label>
+      <div className="mb-1.5 flex items-center justify-between">
+        <label className="text-xs font-medium text-adm-text-secondary">
+          {label}
+        </label>
+        {url && (
+          <div className="flex items-center gap-2 text-[11px]">
+            <a
+              href={toAbsoluteUrl(url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-adm-primary hover:underline"
+            >
+              在新窗口查看
+            </a>
+            <span className="text-adm-text-tertiary">·</span>
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="text-rose-500 hover:underline"
+            >
+              清空
+            </button>
+          </div>
+        )}
+      </div>
       <div className="flex items-center gap-4">
         <div className={`relative shrink-0 overflow-hidden bg-adm-input ${previewClass}`}>
           {url ? (
@@ -255,7 +276,8 @@ function ImageField({
               alt={label}
               fill
               className="object-cover"
-              sizes="64px"
+              sizes="96px"
+              unoptimized
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-adm-text-tertiary">
@@ -268,7 +290,7 @@ function ImageField({
             type="text"
             value={url}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="输入图片URL或上传"
+            placeholder="粘贴自有图床链接，或点击下方上传"
             className="w-full rounded-xl border border-adm-border bg-adm-input px-3 py-2 text-sm text-adm-text transition-colors focus:border-adm-text-secondary focus:bg-adm-input-focus focus:outline-none focus:ring-1 focus:ring-adm-text-secondary"
           />
           <div className="flex gap-2">
@@ -297,11 +319,17 @@ function ImageField({
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) handleFile(file);
+              e.target.value = "";
             }}
             className="hidden"
           />
         </div>
       </div>
+      {hint && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-adm-text-tertiary">
+          {hint}
+        </p>
+      )}
       <MediaPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -486,9 +514,17 @@ export default function AdminSettings() {
         </div>
 
         {/* Images section */}
-        <div className="mb-6 mt-8 flex items-center gap-2 border-b border-adm-border pb-3">
-          <ImageIcon className="h-4 w-4 text-adm-text-tertiary" />
-          <h3 className="text-sm font-semibold text-adm-text">站点图片</h3>
+        <div className="mb-6 mt-8 flex items-center justify-between border-b border-adm-border pb-3">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="h-4 w-4 text-adm-text-tertiary" />
+            <h3 className="text-sm font-semibold text-adm-text">站点图片</h3>
+          </div>
+          <a
+            href="/admin/storage"
+            className="text-xs text-adm-primary hover:underline"
+          >
+            图床与存储配置指引 →
+          </a>
         </div>
 
         <ImageField
@@ -497,6 +533,7 @@ export default function AdminSettings() {
           onChange={(faviconUrl) => setForm({ ...form, faviconUrl })}
           token={token || ""}
           previewClass="h-12 w-12 rounded-lg"
+          hint="显示在浏览器标签页、收藏夹与后台左上角。建议 1:1 正方形（32x32 或 128x128，支持 PNG/SVG/ICO）。支持直接粘贴自有图床链接。"
         />
 
         <ImageField
@@ -505,6 +542,7 @@ export default function AdminSettings() {
           onChange={(ogImage) => setForm({ ...form, ogImage })}
           token={token || ""}
           previewClass="h-20 w-32 rounded-xl"
+          hint="在微信、QQ、X/Twitter 转发分享博客链接时的预览大卡片。建议 16:9（如 1200x630 或 800x450）。支持直接粘贴自有图床链接。"
         />
 
         <ImageField
@@ -513,6 +551,7 @@ export default function AdminSettings() {
           onChange={(decorationImage) => setForm({ ...form, decorationImage })}
           token={token || ""}
           previewClass="h-20 w-32 rounded-xl"
+          hint="桌面端宽屏两侧浮动展示的装饰插画（建议透明底 PNG）。留空时显示默认极简微光动画。支持直接粘贴自有图床链接。"
         />
 
         {/* Legal section */}
@@ -706,28 +745,6 @@ export default function AdminSettings() {
               className="rounded-lg border border-adm-border bg-adm-bg px-3 py-2 text-sm text-adm-text focus:border-adm-primary focus:outline-none focus:ring-1 focus:ring-adm-primary disabled:opacity-50"
             />
           </div>
-        </div>
-
-        {/* Ad placement section */}
-        <div className="mb-6 mt-8 flex items-center gap-2 border-b border-adm-border pb-3">
-          <Megaphone className="h-4 w-4 text-adm-text-tertiary" />
-          <h3 className="text-sm font-semibold text-adm-text">广告设置</h3>
-        </div>
-
-        <div className="mb-6 flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="adOnArchives"
-            checked={form.adOnArchives}
-            onChange={(e) => setForm({ ...form, adOnArchives: e.target.checked })}
-            className="h-4 w-4 rounded border-adm-border text-adm-primary focus:ring-adm-primary"
-          />
-          <label htmlFor="adOnArchives" className="text-sm text-adm-text">
-            在归档页显示广告
-          </label>
-          <p className="text-xs text-adm-text-tertiary">
-            开启后广告会出现在归档页时间线中（第 5 条动态之后）
-          </p>
         </div>
 
         {/* RSS feed section */}

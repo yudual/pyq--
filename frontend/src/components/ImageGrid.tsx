@@ -236,26 +236,29 @@ export default function ImageGrid({ images }: ImageGridProps) {
   );
 
   // Preload single image for aspect ratio
+  const firstImage = images[0] ? getImageSrc(images[0]) : null;
+
   useEffect(() => {
-    if (count !== 1 || !images[0]) {
-      setSingleRatio(null);
+    if (count !== 1 || !firstImage) {
+      setSingleRatio((prev) => (prev === null ? prev : null));
       return;
     }
     let cancelled = false;
     const probe = new window.Image();
     probe.onload = () => {
       if (!cancelled && probe.naturalWidth && probe.naturalHeight) {
-        setSingleRatio(probe.naturalWidth / probe.naturalHeight);
+        const ratio = probe.naturalWidth / probe.naturalHeight;
+        setSingleRatio((prev) => (prev === ratio ? prev : ratio));
       }
     };
     probe.onerror = () => {
       if (!cancelled) setSingleRatio(4 / 3);
     };
-    probe.src = getImageSrc(images[0]);
+    probe.src = firstImage;
     return () => {
       cancelled = true;
     };
-  }, [count, images]);
+  }, [count, firstImage]);
 
   // Cleanup
   useEffect(() => {

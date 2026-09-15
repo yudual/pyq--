@@ -25,8 +25,6 @@ interface SiteSettingsState {
   decorationImage: string;
   /** 网站背景图轮播列表（URL 数组），每次访问随机展示一张 */
   backgroundImages: string[];
-  /** 广告是否在归档页显示 */
-  adOnArchives: boolean;
   /** 默认文章封面（博主个人资料背景图），文章未设置封面时使用 */
   defaultCover: string;
   /** 进入网站是否自动播放歌单音乐 */
@@ -85,7 +83,6 @@ export const useSiteSettings = create<SiteSettingsState>((set, get) => ({
   footerHtml: "",
   decorationImage: "",
   backgroundImages: [],
-  adOnArchives: false,
   defaultCover: "",
   musicAutoplay: false,
   loaded: false,
@@ -121,7 +118,6 @@ export const useSiteSettings = create<SiteSettingsState>((set, get) => ({
         footerHtml: data.footerHtml ?? "",
         decorationImage: data.decorationImage ?? "",
         backgroundImages: bgImages,
-        adOnArchives: data.adOnArchives ?? false,
         defaultCover: data.defaultCover ?? "",
         musicAutoplay: data.musicAutoplay ?? false,
         loaded: true,

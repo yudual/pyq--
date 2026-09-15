@@ -1,10 +1,14 @@
-// HTML 消毒器：基于 DOMParser，允许安全标签与属性，剥离脚本/事件处理器/危险 URL。
-// 用于富文本编辑器输出内容与后端返回内容的渲染前过滤，防止 XSS。
+// HTML 消毒器：同构纯函数实现，允许安全标签与属性，剥离脚本/事件处理器/危险 URL。
+// 用于富文本与 Markdown 输出内容与后端返回内容的渲染前过滤，防止 XSS。
+// 优化说明：
+// 不依赖客户端 DOMParser 与 document 环境分支，
+// 服务端（SSR）与客户端运行完全一致的同构消毒逻辑，彻底根治水合不一致（Hydration Mismatch）。
 
 import { replaceEmojiShortcodes, normalizeInlineEmoji } from "./emoji";
+import { isMarkdown, markdownToHtml, enhanceCodeBlocks } from "./markdown";
 
 const ALLOWED_TAGS = new Set([
-  "p", "br", "strong", "b", "em", "i", "u", "s", "strike", "sub", "sup",
+  "p", "br", "strong", "b", "em", "i", "u", "s", "strike", "del", "sub", "sup",
   "h1", "h2", "h3", "h4", "h5", "h6",
   "ul", "ol", "li",
   "blockquote", "pre", "code",
@@ -12,22 +16,36 @@ const ALLOWED_TAGS = new Set([
   "hr",
   "img",
   "table", "thead", "tbody", "tr", "th", "td",
+  "button", "svg", "path", "line", "circle", "rect", "polygon", "input",
+  "details", "summary",
 ]);
 
 // 允许的全局属性（任何标签都可带）
 const ALLOWED_GLOBAL_ATTRS = new Set([
-  "class", "style", "title", "dir", "lang",
+  "class", "style", "title", "dir", "lang", "id", "data-code", "data-language", "data-heading-text",
 ]);
 
 // 标签特定的属性白名单
 const ALLOWED_ATTRS_BY_TAG: Record<string, Set<string>> = {
-  a: new Set(["href", "target", "rel"]),
-  img: new Set(["src", "alt", "width", "height", "loading"]),
+  a: new Set(["href", "target", "rel", "title"]),
+  img: new Set(["src", "alt", "width", "height", "loading", "title"]),
   ol: new Set(["start", "type"]),
   li: new Set(["value"]),
-  td: new Set(["colspan", "rowspan"]),
-  th: new Set(["colspan", "rowspan", "scope"]),
+  td: new Set(["colspan", "rowspan", "align"]),
+  th: new Set(["colspan", "rowspan", "scope", "align"]),
+  button: new Set(["type", "aria-label", "disabled"]),
+  input: new Set(["type", "disabled", "checked"]),
+  svg: new Set(["width", "height", "viewbox", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "xmlns", "aria-hidden"]),
+  path: new Set(["d", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin"]),
+  line: new Set(["x1", "y1", "x2", "y2", "stroke", "stroke-width", "stroke-linecap"]),
+  circle: new Set(["cx", "cy", "r", "fill", "stroke", "stroke-width"]),
+  rect: new Set(["x", "y", "width", "height", "rx", "ry", "fill", "stroke", "stroke-width"]),
+  polygon: new Set(["points", "fill", "stroke", "stroke-width"]),
 };
+
+const DANGEROUS_TAGS = new Set([
+  "script", "style", "iframe", "object", "embed", "link", "meta", "base", "form", "textarea", "select"
+]);
 
 function isSafeUrl(value: string): boolean {
   const v = value.trim().toLowerCase();
@@ -47,94 +65,103 @@ function sanitizeStyle(value: string): string {
   return cleaned;
 }
 
-function sanitizeNode(node: Element): void {
-  // 递归处理子节点（先复制以避免遍历过程中修改影响）
-  const children = Array.from(node.children);
-  for (const child of children) {
-    const tag = child.tagName.toLowerCase();
-
-    if (!ALLOWED_TAGS.has(tag)) {
-      // 不允许的标签：保留其子内容（unwrap），除非是 script/style 等需要整体删除
-      if (tag === "script" || tag === "style" || tag === "iframe" || tag === "object" || tag === "embed" || tag === "link" || tag === "meta" || tag === "base" || tag === "form" || tag === "input" || tag === "button" || tag === "textarea" || tag === "select") {
-        child.remove();
-        continue;
-      }
-      // 用 fragment 替换，保留子内容
-      const frag = node.ownerDocument!.createDocumentFragment();
-      while (child.firstChild) frag.appendChild(child.firstChild);
-      node.insertBefore(frag, child);
-      child.remove();
-      continue;
-    }
-
-    // 清理属性
-    const allowed = ALLOWED_ATTRS_BY_TAG[tag];
-    const attrs = Array.from(child.attributes);
-    for (const attr of attrs) {
-      const name = attr.name.toLowerCase();
-      const value = attr.value;
-
-      // 移除所有 on* 事件属性
-      if (name.startsWith("on")) {
-        child.removeAttribute(attr.name);
-        continue;
-      }
-      // 允许所有 data-* 属性（惰性数据，无安全风险；用于 embed 占位等）
-      if (name.startsWith("data-")) {
-        continue;
-      }
-      // 全局允许
-      if (ALLOWED_GLOBAL_ATTRS.has(name)) {
-        if (name === "style") {
-          const safe = sanitizeStyle(value);
-          if (!safe) {
-            child.removeAttribute(attr.name);
-          } else {
-            child.setAttribute("style", safe);
-          }
-        }
-        continue;
-      }
-      // 标签特定允许
-      if (allowed && allowed.has(name)) {
-        if ((name === "href" || name === "src") && !isSafeUrl(value)) {
-          child.removeAttribute(attr.name);
-        }
-        continue;
-      }
-      // 其余属性移除
-      child.removeAttribute(attr.name);
-    }
-
-    // 对 <a> 强制补 rel="noopener noreferrer" 当 target=_blank
-    if (tag === "a") {
-      const target = child.getAttribute("target");
-      if (target === "_blank") {
-        child.setAttribute("rel", "noopener noreferrer");
-      }
-    }
-
-    // 递归
-    sanitizeNode(child);
-  }
-}
-
 /**
  * 消毒 HTML 字符串，返回仅含白名单标签/属性的安全 HTML。
- * 服务端返回的纯文本（无 HTML 标签）会原样返回。
+ * 同构运行于 Node.js SSR 与浏览器端，输出 100% 一致，无水合差异。
  */
 export function sanitizeHtml(html: string): string {
   if (!html) return "";
   // 快速路径：完全不含 < 字符的纯文本直接返回
   if (html.indexOf("<") === -1) return html;
 
-  if (typeof document === "undefined") return html;
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(`<div id="__root">${html}</div>`, "text/html");
-  const root = doc.getElementById("__root");
-  if (!root) return "";
-  sanitizeNode(root);
-  return root.innerHTML;
+  // 1. 移除危险标签及其内部所有内容
+  let sanitized = html.replace(
+    /<(script|style|iframe|object|embed|form|textarea|select|link|meta|base)\b[^>]*>[\s\S]*?<\/\1>/gi,
+    ""
+  );
+  // 处理未闭合或单闭合的危险标签
+  sanitized = sanitized.replace(
+    /<(script|style|iframe|object|embed|form|textarea|select|link|meta|base)\b[^>]*\/?>/gi,
+    ""
+  );
+
+  // 2. 移除所有内联事件处理器 on*="..." 或 on*='...' 或 on*=...
+  sanitized = sanitized.replace(/\s+on[a-z0-9_]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+
+  // 3. 标签与属性过滤（同构词法解析）
+  sanitized = sanitized.replace(
+    /<\/?([a-z0-9_-]+)((?:\s+[^"'<>\s]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>/gi,
+    (match, rawTagName, rawAttrs, selfClosing) => {
+      const tag = rawTagName.toLowerCase();
+      const isClosing = match.startsWith("</");
+
+      if (DANGEROUS_TAGS.has(tag)) return "";
+      if (!ALLOWED_TAGS.has(tag)) return "";
+      if (isClosing) return `</${tag}>`;
+
+      const allowedAttrs = ALLOWED_ATTRS_BY_TAG[tag];
+      const attrRegex = /([a-z0-9_-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/gi;
+      let attrMatch: RegExpExecArray | null;
+      const validAttrs: string[] = [];
+      let hasTargetBlank = false;
+      let hasRel = false;
+
+      while ((attrMatch = attrRegex.exec(rawAttrs)) !== null) {
+        const attrName = attrMatch[1].toLowerCase();
+        let attrValue = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
+
+        // 丢弃 on* 事件
+        if (attrName.startsWith("on")) continue;
+
+        // 允许 data-* 属性（用于 embed、代码快照等）
+        if (attrName.startsWith("data-")) {
+          validAttrs.push(`${attrName}="${attrValue.replace(/"/g, "&quot;")}"`);
+          continue;
+        }
+
+        // 全局白名单属性
+        if (ALLOWED_GLOBAL_ATTRS.has(attrName)) {
+          if (attrName === "style") {
+            const safe = sanitizeStyle(attrValue);
+            if (safe) {
+              validAttrs.push(`style="${safe.replace(/"/g, "&quot;")}"`);
+            }
+          } else {
+            validAttrs.push(`${attrName}="${attrValue.replace(/"/g, "&quot;")}"`);
+          }
+          continue;
+        }
+
+        // 标签特定白名单属性
+        if (allowedAttrs && allowedAttrs.has(attrName)) {
+          if ((attrName === "href" || attrName === "src") && !isSafeUrl(attrValue)) {
+            continue;
+          }
+          if (tag === "a" && attrName === "target" && attrValue === "_blank") {
+            hasTargetBlank = true;
+          }
+          if (tag === "a" && attrName === "rel") {
+            hasRel = true;
+            if (hasTargetBlank && !attrValue.includes("noopener")) {
+              attrValue = "noopener noreferrer";
+            }
+          }
+          validAttrs.push(`${attrName}="${attrValue.replace(/"/g, "&quot;")}"`);
+        }
+      }
+
+      // 对 target="_blank" 的 <a> 强制补齐 rel="noopener noreferrer"
+      if (tag === "a" && hasTargetBlank && !hasRel) {
+        validAttrs.push('rel="noopener noreferrer"');
+      }
+
+      const attrString = validAttrs.length > 0 ? " " + validAttrs.join(" ") : "";
+      const closingSlash = selfClosing || (tag === "br" || tag === "hr" || tag === "img" || tag === "input") ? " /" : "";
+      return `<${tag}${attrString}${closingSlash}>`;
+    }
+  );
+
+  return sanitized;
 }
 
 /**
@@ -158,12 +185,19 @@ export function looksLikeHtml(text: string): boolean {
 }
 
 /**
- * 渲染入口：自动判断纯文本或 HTML，返回安全的 HTML 字符串供 dangerouslySetInnerHTML 使用。
+ * 渲染入口：自动识别 Markdown 或 HTML，返回安全的美化 HTML 供 dangerouslySetInnerHTML 使用。
  */
 export function renderContent(content: string): string {
   if (!content) return "";
-  const html = looksLikeHtml(content)
-    ? sanitizeHtml(content)
-    : plainTextToHtml(content);
-  return normalizeInlineEmoji(replaceEmojiShortcodes(html));
+
+  let html = content;
+  if (isMarkdown(content)) {
+    html = markdownToHtml(content);
+  } else if (!looksLikeHtml(content)) {
+    html = plainTextToHtml(content);
+  }
+
+  const sanitized = sanitizeHtml(html);
+  const withEmoji = normalizeInlineEmoji(replaceEmojiShortcodes(sanitized));
+  return enhanceCodeBlocks(withEmoji);
 }

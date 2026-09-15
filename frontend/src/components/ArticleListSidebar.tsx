@@ -6,9 +6,12 @@ import { BookText } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSiteSettings } from "@/lib/site-settings-store";
 import { toAbsoluteUrl } from "@/lib/upload";
+import { resolveCoverImage } from "@/lib/post-image";
 import DoubanSidebar from "./DoubanSidebar";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { PUBLIC_API_URL } from "@/lib/api-fetch";
+
+const API_URL = PUBLIC_API_URL;
 
 interface ArticleListItem {
   id: string;
@@ -114,17 +117,20 @@ export default function ArticleListSidebar() {
                             : "hover:bg-wechat-hover dark:hover:bg-white/5"
                         }`}
                       >
-                        {(article.cover || defaultCover) && (
-                          <div className="relative h-12 w-16 shrink-0 overflow-hidden rounded-md bg-wechat-bubble dark:bg-white/5">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={toAbsoluteUrl(article.cover || defaultCover)}
-                              alt=""
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                        )}
+                        {(() => {
+                          const cover = resolveCoverImage(article.cover, null, defaultCover);
+                          return cover ? (
+                            <div className="relative h-12 w-16 shrink-0 overflow-hidden rounded-md bg-wechat-bubble dark:bg-white/5">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={cover}
+                                alt=""
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            </div>
+                          ) : null;
+                        })()}
                         <div className="min-w-0 flex-1">
                           <p
                             className={`line-clamp-2 text-[13px] font-medium leading-snug ${

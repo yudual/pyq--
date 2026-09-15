@@ -89,8 +89,8 @@ export type PostImage = string | { src: string; video?: string };
 export interface Post {
   id: string;
   shortId?: string;
-  /** moment=朋友圈动态（默认），article=长文章 */
-  type?: "moment" | "article";
+  /** moment=朋友圈动态（默认），article=长文章，project=项目作品 */
+  type?: "moment" | "article" | "project";
   /** 文章标题 */
   title?: string;
   /** 文章摘要 / 朋友圈配文（article 类型：显示在卡片上方的动态文字） */
@@ -114,9 +114,6 @@ export interface Post {
   video?: PostVideo | null;
   douban?: PostDouban | null;
   pinned?: boolean;
-  isAd?: boolean;
-  adAvatar?: string;
-  adNickname?: string;
   likesDisabled?: boolean;
   commentsDisabled?: boolean;
   createdAt: string;
@@ -126,29 +123,8 @@ export interface Post {
   meLiked?: boolean;
   /** 阅读量（文章详情页客户端 fetch ?view=1 时递增） */
   viewCount?: number;
-}
-
-// Cravatar avatar URL. Each nickname gets a stable MD5 hash so Cravatar returns
-// a unique built-in "wavatar" face when the email is not registered.
-// Docs: https://cravatar.com/developer/api
-function cravatar(nickname: string): string {
-  const hashMap: Record<string, string> = {
-    "锦的朋友圈": "3f388dfc60fb7380e503e661615be197",
-    Kam: "d968a18370429ceee4e7fb0268ec50bf",
-    CC: "e0323a9039add2978bf5b49550572c7c",
-    DD: "1aabac6d068eef6a7bad3fdf50a05cc8",
-    雁七: "5da2f59100950c8f5238d8f95f7c96a3",
-    本牛千智: "152fd4f64a869c8875207d0ee9b69f6f",
-    lcc: "d18f6736f3e3f8a57f06409359a4cdd6",
-    FF: "633de4b0c14ca52ea2432a3c8a5c4c31",
-    "30位访客": "93ae5cbc1da09380961b88c147630d81",
-  };
-  const hash =
-    hashMap[nickname] ??
-    Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-  // Use Cravatar's built-in "wavatar" default so every hash produces a unique
-  // cartoon face without query-string limitations on custom fallback URLs.
-  return `https://cravatar.cn/avatar/${hash}?s=200&d=wavatar`;
+  /** 发布状态：published=已发布，draft=草稿 */
+  status?: "published" | "draft";
 }
 
 export const owner: User = {
@@ -159,149 +135,251 @@ export const owner: User = {
   bio: "这是一个朋友圈博客程序",
 };
 
+function hoursAgo(h: number): string {
+  const d = new Date();
+  d.setHours(d.getHours() - h);
+  return d.toISOString();
+}
+
+function daysAgo(d: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - d);
+  return date.toISOString();
+}
+
 export const posts: Post[] = [
+  // 1. 深度长文文章
   {
-    id: "p1",
-    author: {
-      id: "u2",
-      nickname: "Kam",
-      avatar: cravatar("Kam"),
-      cover: "",
-      bio: "",
-    },
-    content: "",
-    images: [
-      "https://picsum.photos/seed/temple1/400/400",
-      "https://picsum.photos/seed/temple2/400/400",
-      "https://picsum.photos/seed/temple3/400/400",
-    ],
-    createdAt: minutesAgo(4),
-    likes: [{ name: "DD" }, { name: "30位访客" }],
-    comments: [
-      {
-        id: "c1",
-        author: "CC",
-        content:
-          "你好博主，我想知道这个主题如果写长文章，会以怎样的样式呈现？是依旧朋友圈状态长文收缩，还是类似公众号文章分享卡片，又或者有其他自定义方式？",
-        createdAt: minutesAgo(3),
-      },
-      {
-        id: "c2",
-        author: "雁七",
-        content:
-          "想购买主题，想咨询一下是不是wordpress的，微信号一直没找着啊",
-        createdAt: minutesAgo(3),
-      },
-      {
-        id: "c3",
-        author: "本牛千智",
-        content: "主题介绍在哪",
-        createdAt: minutesAgo(2),
-      },
-      {
-        id: "c4",
-        author: "Kam",
-        replyTo: "本牛千智",
-        content: "往下翻",
-        createdAt: minutesAgo(2),
-      },
-      {
-        id: "c5",
-        author: "lcc",
-        replyTo: "Kam",
-        content:
-          "想问问能不能和普通wp一样设置回复可见，以及其他人登录后也可以发朋友圈。",
-        createdAt: minutesAgo(1),
-      },
-      {
-        id: "c6",
-        author: "本牛千智",
-        content: "这个可以像朋友圈那样发视频不？",
-        createdAt: minutesAgo(1),
-      },
-      {
-        id: "c7",
-        author: "Kam",
-        replyTo: "本牛千智",
-        content: "可以的",
-        createdAt: minutesAgo(1),
-      },
-      {
-        id: "c8",
-        author: "FF",
-        content: "你怎么跑清水寺 Happy 了。",
-        createdAt: minutesAgo(1),
-      },
-      {
-        id: "c9",
-        author: "Kam",
-        replyTo: "FF",
-        content: "哈哈，京都特种兵。",
-        createdAt: minutesAgo(1),
-      },
-    ],
-  },
-  {
-    id: "p2",
+    id: "post-art-1",
+    shortId: "digital-garden",
+    type: "article",
+    category: "文章",
+    title: "从零构筑一座数字花园：在碎片化时代重拾专注与自我沉淀",
+    excerpt: "比起随处可见的信息洪流，我更想要一个只属于自己的小角落。在这里，思考不必为了讨好算法，生活也不需要迎合谁的期待。",
+    cover: "https://picsum.photos/seed/garden88/800/500",
     author: owner,
-    content:
-      "做了一款“朋友圈风格”的个人博客主题，支持图片、视频、长文、评论、点赞，手机电脑都能看。欢迎来逛。",
-    images: ["https://picsum.photos/seed/blogtheme/600/400"],
-    createdAt: "2025-11-10T09:12:00+08:00",
-    likes: [{ name: "Kam" }, { name: "雁七" }, { name: "CC" }],
-    comments: [
-      {
-        id: "c10",
-        author: "Kam",
-        content: "整体风格很干净，期待上线。",
-        createdAt: "2025-11-10T09:30:00+08:00",
-      },
-    ],
-  },
-  {
-    id: "p3",
-    author: owner,
-    content: "周末去了趟海边，风很大，但天很蓝。",
-    images: [
-      "https://picsum.photos/seed/sea1/400/400",
-      "https://picsum.photos/seed/sea2/400/400",
-      "https://picsum.photos/seed/sea3/400/400",
-      "https://picsum.photos/seed/sea4/400/400",
-    ],
-    createdAt: "2025-11-05T18:45:00+08:00",
-    likes: [{ name: "DD" }, { name: "lcc" }],
-    comments: [],
-  },
-  {
-    id: "p4",
-    author: {
-      id: "u3",
-      nickname: "CC",
-      avatar: cravatar("CC"),
-      cover: "",
-      bio: "",
-    },
-    content:
-      "长文测试：有时候，我们总想用一段文字记录当下的情绪。朋友圈的仪式感在于，它不像公众号那样正式，也不像微博那样喧嚣。它是一份只给在乎的人看的日记。愿这个主题能帮你把生活过得更像生活。",
+    content: `
+      <p>在这个被算法推荐和碎片短视频填满的时代，我们每天被动接收海量的信息，却常常在深夜关掉屏幕时感到前所未有的空虚。我常常问自己：上一次安安静静读完一本书、写下一篇完整的思考，是在什么时候？</p>
+      <h2>一、为什么我们需要一座「数字花园」？</h2>
+      <p>传统的社交媒体像是一条永不停歇的高速公路，每条动态的寿命不过几个小时，然后就被更新的浪潮淹没。而「数字花园」则截然不同——它是一个慢下来的地方，像真实的植物一样，这里的文字可以慢慢生长、修剪和发芽。</p>
+      <p>在这里，我不必担心排版是否迎合爆款逻辑，也不用在意有没有成百上千的点赞。它首先属于我自己，记录我的灵感碎片、代码折腾、读过的书与看过的动漫。</p>
+      <blockquote>灵感就像清晨草叶上的露珠，如果不及时收纳在自己的容器里，太阳一出来就会蒸发得无影无踪。</blockquote>
+      <h2>二、慢节奏生活的治愈力</h2>
+      <p>生活本身的质感往往藏在那些不起眼的细节里：下班路上吹过的晚风、煮咖啡时升起的热气、偶然听到的一首老歌。当我们开始认真记录这些微小的瞬间，原本平淡无奇的日子也会悄然变得立体而丰盈。</p>
+      <h2>三、写在最后</h2>
+      <p>希望来到这里的每一位朋友，都能在这个安静的角落里放慢脚步，找到片刻属于自己的宁静。愿我们都能在这个喧嚣的世界里，守住自己心中的那片小天地。</p>
+    `,
     images: [],
-    createdAt: "2025-10-28T21:00:00+08:00",
-    likes: [{ name: "锦的朋友圈" }, { name: "Kam" }],
+    createdAt: hoursAgo(3),
+    likes: [{ name: "CC" }, { name: "雁七" }, { name: "Kam" }, { name: "小明" }],
     comments: [
       {
-        id: "c11",
+        id: "c101",
+        author: "CC",
+        content: "很赞同这句‘灵感就像清晨的露珠’，个人主页确实该多一些这种安静的文字！",
+        createdAt: hoursAgo(2),
+      },
+      {
+        id: "c102",
         author: "雁七",
-        content: "写得太好了。",
-        createdAt: "2025-10-28T21:10:00+08:00",
+        content: "排版非常舒服，看得很享受～期待下一篇更新！",
+        createdAt: hoursAgo(1),
+      },
+    ],
+    viewCount: 256,
+  },
+
+  // 2. 独立项目展示
+  {
+    id: "post-proj-1",
+    shortId: "minimark-app",
+    type: "moment",
+    category: "项目",
+    author: owner,
+    title: "MiniMark 极简本地优先写作卡片",
+    cover: "https://picsum.photos/seed/minimarkcover/1200/600",
+    content: "🛠️ 【独立折腾】发布了一款极简本地优先写作卡片工具「MiniMark」\n\n利用几周的周末时间，把一直想做的轻量卡片工具实现了出来：\n✦ 零账号体系，纯本地 SQLite/LocalStorage 离线加密存储\n✦ 极简双栏布局，毫秒级 Markdown 实时解析与大纲自动生成\n✦ 支持生成类似拍立得风格的分享卡片与长图\n\n纯粹为自己写作打造，告别臃肿，只留专注。代码已在 GitHub 开源，欢迎体验与交流～",
+    images: [],
+    linkCard: {
+      url: "https://github.com/yudual",
+      title: "MiniMark: Minimalist Local-First Writing Cards",
+      description: "轻量、纯粹、无干扰的个人灵感卡片与写作空间",
+      image: "https://picsum.photos/seed/minimarkcover/1200/600",
+      siteName: "GitHub",
+    },
+    location: {
+      name: "独立工作室",
+      city: "深夜敲代码",
+    },
+    createdAt: hoursAgo(12),
+    likes: [{ name: "Kam" }, { name: "本牛千智" }, { name: "CC" }],
+    comments: [
+      {
+        id: "c201",
+        author: "Kam",
+        content: "界面质感很高级！卡片导出效果太赞了！",
+        createdAt: hoursAgo(10),
+      },
+      {
+        id: "c202",
+        author: "本牛千智",
+        content: "请问开源地址在哪？想给个 star！",
+        createdAt: hoursAgo(8),
+      },
+      {
+        id: "c203",
+        author: "小予",
+        replyTo: "本牛千智",
+        content: "直接点上面的卡片就可以跳转 GitHub 啦～",
+        createdAt: hoursAgo(6),
+      },
+    ],
+  },
+
+  // 3. 岁岁念 · 动漫感悟
+  {
+    id: "post-mom-1",
+    shortId: "frieren-thoughts",
+    type: "moment",
+    category: "岁岁念",
+    author: owner,
+    content: "最近重温完《葬送的芙莉莲》，再次被这种克制而深刻的情绪打动。\n\n时间对于长寿的精灵而言是弹指一挥，但正是那些看似漫不经心的同行旅程，在往后数百年的回溯中构成了最耀眼的光。我们总在年轻时以为一切都来日方长，却往往在告别之后才真正理解某个人、某句话的重量。\n\n「既然如此，那就从现在开始去了解吧。」—— 很喜欢这句台词，温柔且充满力量。",
+    images: [
+      "https://picsum.photos/seed/animeart1/600/600",
+      "https://picsum.photos/seed/coffeeview1/600/600",
+    ],
+    location: {
+      name: "街角书店",
+      city: "咖啡香里",
+    },
+    createdAt: daysAgo(1),
+    likes: [{ name: "雁七" }, { name: "CC" }, { name: "DD" }, { name: "lcc" }],
+    comments: [
+      {
+        id: "c301",
+        author: "雁七",
+        content: "“了解别人的旅行”真的很触动人，每一集的配乐也是神仙级别！",
+        createdAt: daysAgo(1),
+      },
+    ],
+  },
+
+  // 4. 岁岁念 · 连载小说 / 故事断章
+  {
+    id: "post-mom-2",
+    shortId: "station-four",
+    type: "moment",
+    category: "岁岁念",
+    author: owner,
+    content: "📖 【小说断章 · 第四号观测站的黄昏】\n\n“气压表上的红色指针在黄昏六点一刻准时颤抖了一下。老林放下手里的铝制水壶，推开了厚重的铁皮窗。风从戈壁滩的尽头吹过来，夹杂着粗糙的沙粒与某种极淡的金属气味。\n\n观测塔已经三年没有接收到总部的回信了。但老林依然每天雷打不动地校准射电天线。他说：‘宇宙那么大，电波走得慢一点是理所当然的。我在这里等它，它总会来的。’\n\n地平线尽头的晚霞如同一场盛大的熔金。”\n\n—— 随手敲的一小段，偶尔放飞脑洞写故事真的非常解压。",
+    images: [
+      "https://picsum.photos/seed/desert-sunset/800/500",
+    ],
+    createdAt: daysAgo(2),
+    likes: [{ name: "Kam" }, { name: "CC" }],
+    comments: [
+      {
+        id: "c401",
+        author: "CC",
+        content: "好有科幻电影既视感！老林后来收到回信了吗？求继续写！",
+        createdAt: daysAgo(2),
+      },
+    ],
+  },
+
+  // 5. 第二篇深度长文
+  {
+    id: "post-art-2",
+    shortId: "minimalist-design",
+    type: "article",
+    category: "文章",
+    title: "给个人主页做减法：关于极简质感与液态玻璃设计的思考",
+    excerpt: "当页面堆满复杂的动效与边框，访客往往找不到视线的焦点。设计中最难的不是做加法，而是克制地留白与呼应。",
+    cover: "https://picsum.photos/seed/cleanui/800/500",
+    author: owner,
+    content: `
+      <p>在设计这次的主页重构方案时，我一度尝试过许多酷炫的 3D 卡片、陀螺仪摇晃和悬浮粒子特效。但反复看上几天之后，发现这种强烈的视觉刺激很快就会让人感到疲劳。</p>
+      <h2>一、去掉视觉噪音，回归阅读体验</h2>
+      <p>真正耐看的设计，往往是安静且具有呼吸感的。全宽的液态毛玻璃顶栏、轻盈的边缘阴影过渡、克制的圆角卡片，这些细节不喧宾夺主，而是为核心文字与图文内容服务。</p>
+      <h2>二、内容与形式的平衡</h2>
+      <p>一个好的个人主页，第一眼应该让访客迅速感受到主人的气质与审美，接着自然而然地引导访客探索深度的长文或者有趣的日常碎片。</p>
+      <p>生活需要留白，网页设计也是一样。少即是多，慢下来才走得更远。</p>
+    `,
+    images: [],
+    createdAt: daysAgo(3),
+    likes: [{ name: "DD" }, { name: "Kam" }, { name: "本牛千智" }],
+    comments: [],
+    viewCount: 189,
+  },
+
+  // 6. 岁岁念 · 日常抓拍与生活琐碎
+  {
+    id: "post-mom-3",
+    shortId: "orange-sunset",
+    type: "moment",
+    category: "岁岁念",
+    author: owner,
+    content: "今日份傍晚的天空像打翻的橘子果酱🍊！\n\n路过公园买了一杯热拿铁，坐在长椅上吹了半小时晚风。看着树影被夕阳拉得很长，突然觉得生活里那些焦虑的小事好像也没什么大不了的。明天也要元气满满～",
+    images: [
+      "https://picsum.photos/seed/orangesky1/400/400",
+      "https://picsum.photos/seed/orangesky2/400/400",
+      "https://picsum.photos/seed/coffeehand/400/400",
+    ],
+    location: {
+      name: "滨江公园长椅",
+      city: "日落时分",
+    },
+    createdAt: daysAgo(4),
+    likes: [{ name: "CC" }, { name: "雁七" }],
+    comments: [
+      {
+        id: "c601",
+        author: "雁七",
+        content: "好惬意的日落！这个天空颜色太绝了",
+        createdAt: daysAgo(4),
+      },
+    ],
+  },
+
+  // 7. 独立作品项目展示
+  {
+    id: "post-proj-2",
+    shortId: "dual-blog",
+    type: "moment",
+    category: "项目",
+    author: owner,
+    title: "Dual Blog 个人朋友圈博客系统",
+    cover: "https://picsum.photos/seed/cleanui/1200/600",
+    content: "🚀 【开源发布】Dual Blog 个人朋友圈博客系统\n\n以「微信朋友圈」交互为灵魂，重新定义个人写作与记录：\n✦ 深度长文与朋友圈碎碎念双模共存\n✦ 原生暗黑液态玻璃拟态质感与全响应式布局\n✦ 内置豆瓣书影音挂载与无损音乐流直连播放\n\n探索属于每个人的独立数字花园与慢思考空间。",
+    images: [],
+    linkCard: {
+      url: "https://github.com/yudual/pyq--",
+      title: "Dual Blog - Modern WeChat Moments Personal Blog",
+      description: "现代、极简、温润的个人朋友圈动态与文章聚合博客系统",
+      image: "https://picsum.photos/seed/cleanui/1200/600",
+      siteName: "GitHub",
+    },
+    location: {
+      name: "开源工坊",
+      city: "数字花园",
+    },
+    createdAt: daysAgo(5),
+    likes: [{ name: "CC" }, { name: "雁七" }, { name: "Kam" }],
+    comments: [
+      {
+        id: "c204",
+        author: "CC",
+        content: "朋友圈和博客的结合太有创意了，非常丝滑！",
+        createdAt: daysAgo(5),
       },
     ],
   },
 ];
 
-function minutesAgo(n: number): string {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - n);
-  return d.toISOString();
-}
+export const sampleArticles: Post[] = posts.filter((p) => p.type === "article");
+export const sampleProjects: Post[] = posts.filter((p) => p.category === "项目" || p.type === "project");
+export const sampleMoments: Post[] = posts.filter((p) => p.type !== "article" && p.category !== "项目");
+
 
 /**
  * 时区安全的时间格式化工具。
@@ -450,3 +528,18 @@ export function formatCommentTime(iso: string): string {
   const pad = (n: number) => n.toString().padStart(2, "0");
   return `${date.getMonth() + 1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
+
+export const defaultAboutContent = `
+<h2>你好，我是 Dual 👋</h2>
+<p>欢迎来到我的个人自留地。这里是我记录生活切片、折腾技术作品与沉淀文字的地方。</p>
+<h3>🌱 关于这个小站</h3>
+<p>网站以「个人主页为主，生活动态与随笔为辅」构建。顶部全宽液态毛玻璃导航栏串联起我的不同频道：</p>
+<ul>
+  <li><strong>文章</strong>：深度的长文写作、技术反思与生活哲学；</li>
+  <li><strong>项目</strong>：业余时间捣鼓的独立开发作品与灵感产物；</li>
+  <li><strong>岁岁念</strong>：像微信朋友圈一样轻松的生活日常、连载小说段落、动漫感悟与摄影抓拍。</li>
+</ul>
+<h3>☕ 兴趣与日常</h3>
+<p>喜欢看动漫（特别喜欢《葬送的芙莉莲》这类沉静温柔的叙事）、尝试写科幻小说断章、偶尔喝一杯手冲咖啡，在傍晚的晚风里散步。</p>
+<p>如果你也碰巧路过这里，欢迎在下方的评论区打个招呼～</p>
+`;

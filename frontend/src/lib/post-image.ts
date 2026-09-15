@@ -4,7 +4,6 @@ import { toAbsoluteUrl } from "./upload";
 export function isLivePhoto(img: PostImage): boolean {
   return typeof img === "object" && !!img?.video;
 }
-
 export function getImageSrc(img: PostImage): string {
   return typeof img === "string" ? img : img.src;
 }
@@ -31,4 +30,39 @@ export function normalizeImages(
 // 提取纯 src 数组（用于旧组件兼容、预加载等）
 export function extractImageSrcs(images: PostImage[]): string[] {
   return images.map(getImageSrc);
+}
+
+/**
+ * 从 Markdown 正文中提取第一张图片的 URL
+ */
+export function extractFirstMarkdownImage(content?: string | null): string {
+  if (!content) return "";
+  const match = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/);
+  if (match) return match[1];
+  const htmlMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return htmlMatch ? htmlMatch[1] : "";
+}
+
+/**
+ * 解析文章或项目的封面图：
+ * 优先级 1: 显式指定的封面 (post.cover)
+ * 优先级 2: 正文中的第一张图片 (首图法则)
+ * 优先级 3: 全局站点默认封面 (fallbackCover)
+ */
+export function resolveCoverImage(
+  explicitCover?: string | null,
+  content?: string | null,
+  fallbackCover?: string | null
+): string {
+  if (explicitCover && explicitCover.trim()) {
+    return toAbsoluteUrl(explicitCover.trim());
+  }
+  const firstImage = extractFirstMarkdownImage(content);
+  if (firstImage) {
+    return toAbsoluteUrl(firstImage);
+  }
+  if (fallbackCover && fallbackCover.trim()) {
+    return toAbsoluteUrl(fallbackCover.trim());
+  }
+  return "";
 }

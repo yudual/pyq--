@@ -6,7 +6,9 @@ import type { LinkCard } from "@/lib/mock-data";
 import { toAbsoluteUrl } from "@/lib/upload";
 import AdminModal from "./AdminModal";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { PUBLIC_API_URL } from "@/lib/api-fetch";
+
+const API_URL = PUBLIC_API_URL;
 
 interface LinkCardPanelProps {
   open: boolean;
