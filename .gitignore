@@ -47,3 +47,10 @@ Thumbs.db
 
 # Trae internal
 .trae/
+
+# 部署实录与部署脚本（含明文密钥/密码/Token，严禁提交）
+项目部署情况*.md
+deploy-*.sh
+test-db.js
+.workbuddy-ai/
+*.pem
