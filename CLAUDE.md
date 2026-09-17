@@ -50,8 +50,10 @@ Do not make schema changes happen during ordinary application startup or serverl
 
 Production media uses Cloudflare R2. Preserve the direct-upload flow: backend presigns upload → browser uploads directly to R2 → backend confirms the upload. Vercel's filesystem is not persistent, so do not implement normal production media uploads through its serverless filesystem or multipart proxy.
 
-## Deployment modes
+## Deployment modes and build rules
 
+- **Strict Build Rule (DO NOT BUILD ON VPS):** Never run `next build`, `pnpm build`, or `tsc` on the 1GB RAM production VPS! Building must be done locally or in GitHub Actions cloud CI. The VPS only pulls pre-built artifacts or releases.
+- **Local Development First:** Complete all development, debugging, and verification in the local environment (`http://localhost:3000`) before any production releases.
 - **Recommended:** independent Vercel projects rooted at `frontend/` and `backend/`. The backend Vercel function uses the Node runtime because it requires MySQL/mysql2. It exposes the shared Express app and has a daily Douban synchronization cron.
 - **Self-hosted:** frontend standalone build on port 3000 and backend on port 4000, supervised with the supplied PM2 configs. Nginx proxies `/api/` to the backend, proxies the rest to Next.js, and can serve legacy local uploads plus static emoji/font assets.
 
@@ -59,4 +61,4 @@ For serverless database connections, `src/config/database.ts` intentionally defa
 
 ## Project-specific instructions
 
-`frontend/AGENTS.md` applies to frontend work: this repository uses a Next.js version with potentially unfamiliar or breaking conventions. Before changing Next.js APIs, routing, caching, or configuration, read the relevant documentation under `frontend/node_modules/next/dist/docs/` and heed its deprecation notices.
+`AGENTS.md` and `frontend/AGENTS.md` apply to all agent work. Heed deprecation notices and read Next.js docs under `frontend/node_modules/next/dist/docs/`.
