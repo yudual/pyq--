@@ -1,13 +1,15 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BookUser, Camera, ExternalLink, Eye, EyeOff, FlaskConical, Info, LayoutDashboard, Link2, Lock, LogOut, MoreVertical, MonitorSmartphone, UserRound } from "lucide-react";
+import { BookUser, Camera, ExternalLink, Eye, EyeOff, FlaskConical, Info, LayoutDashboard, Lock, LogOut, MoreVertical, MonitorSmartphone, UserRound } from "lucide-react";
 import { User as UserType } from "@/lib/mock-data";
 import { cravatarUrl } from "@/lib/avatar";
 import { toAbsoluteUrl } from "@/lib/upload";
 import { PublishModal, type LoggedInUser } from "@/components/TopBar";
+import { notifyContentUpdated } from "@/lib/content-sync";
 import { SocialIcon, getSocialPlatform } from "@/components/SocialIcons";
 import AdminNotifications from "@/components/AdminNotifications";
 
@@ -543,10 +545,11 @@ export default function Sidebar({ owner }: SidebarProps) {
       {showPublish && loggedIn && (
         <PublishModal
           token={loggedIn.token}
+          defaultCategory="日常"
           onClose={() => setShowPublish(false)}
           onPublished={() => {
             setShowPublish(false);
-            window.dispatchEvent(new CustomEvent("post-published"));
+            notifyContentUpdated();
           }}
         />
       )}

@@ -540,6 +540,7 @@ router.post(
     body("commentsDisabled").optional().isBoolean(),
     body("pinned").optional().isBoolean(),
     body("status").optional().isIn(["published", "draft"]),
+    body("createdAt").optional({ values: "falsy" }).isISO8601().toDate(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -568,6 +569,7 @@ router.post(
       commentsDisabled = false,
       pinned = false,
       status = "published",
+      createdAt,
     } = req.body;
 
     const normalizedMusic = await validateR2MusicPayload(music, req.user!.id);
@@ -602,6 +604,7 @@ router.post(
           status,
           ip,
           region,
+          ...(createdAt ? { createdAt: new Date(createdAt) } : {}),
         });
         break;
       } catch (err: any) {
@@ -651,6 +654,7 @@ router.put(
     body("commentsDisabled").optional().isBoolean(),
     body("pinned").optional().isBoolean(),
     body("status").optional().isIn(["published", "draft"]),
+    body("createdAt").optional({ values: "falsy" }).isISO8601().toDate(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -674,7 +678,7 @@ router.put(
 
     const oldPath = getCanonicalPostPath(post);
 
-    await post.update({
+    const updateFields: any = {
       type: req.body.type !== undefined ? req.body.type : post.type,
       title: req.body.title !== undefined ? req.body.title : post.title,
       excerpt: req.body.excerpt !== undefined ? req.body.excerpt : post.excerpt,
@@ -694,7 +698,13 @@ router.put(
       commentsDisabled: req.body.commentsDisabled !== undefined ? req.body.commentsDisabled : post.commentsDisabled,
       pinned: finalPinned,
       status: req.body.status !== undefined ? req.body.status : post.status,
-    });
+    };
+    if (req.body.createdAt) {
+      updateFields.createdAt = new Date(req.body.createdAt);
+    }
+
+    await Post.update(updateFields, { where: { id: post.id } });
+    await post.reload();
 
     const newPath = getCanonicalPostPath(post);
     // 触发首页与详情页 ISR 重生成，确保刷新页面看到最新动态

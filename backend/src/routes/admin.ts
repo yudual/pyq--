@@ -97,6 +97,15 @@ router.get("/users", authenticate, requireAdmin, async (_req: AuthRequest, res: 
   res.json(users);
 });
 
+function tryParseJson<T>(val: any, fallback: T): T {
+  if (typeof val !== "string") return val ?? fallback;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return fallback;
+  }
+}
+
 // GET /api/admin/posts - 管理端文章/动态列表（支持 type 过滤、分页）
 // type=article → 仅文章；type=moment → 仅动态；不传 → 全部
 router.get("/posts", authenticate, requireAdmin, async (req: AuthRequest, res: Response) => {
@@ -136,11 +145,17 @@ router.get("/posts", authenticate, requireAdmin, async (req: AuthRequest, res: R
       excerpt: p.excerpt ? stripMarkdownAndFrontmatter(p.excerpt) : "",
       cover: p.cover || "",
       category: p.category || "",
-      content: stripMarkdownAndFrontmatter(p.content || "").slice(0, 200),
+      content: p.type === "article" ? stripMarkdownAndFrontmatter(p.content || "").slice(0, 200) : (p.content || ""),
       articleType: p.articleType || "original",
       repostUrl: p.repostUrl || "",
-      linkCard: p.linkCard || null,
-      images: p.images || [],
+      linkCard: tryParseJson(p.linkCard, null),
+      images: tryParseJson(p.images, []),
+      location: tryParseJson(p.location, null),
+      music: tryParseJson(p.music, null),
+      video: tryParseJson(p.video, null),
+      douban: tryParseJson(p.douban, null),
+      likesDisabled: !!p.likesDisabled,
+      commentsDisabled: !!p.commentsDisabled,
       pinned: !!p.pinned,
       status: p.status || "published",
       createdAt: p.createdAt,

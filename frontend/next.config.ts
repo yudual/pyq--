@@ -8,6 +8,12 @@ const MEDIA_HOST = process.env.NEXT_PUBLIC_MEDIA_ORIGIN
 const nextConfig: NextConfig = {
   output: "standalone",
   staticPageGenerationTimeout: 300,
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+      static: 30,
+    },
+  },
   images: {
     unoptimized: true,
     dangerouslyAllowLocalIP: true,

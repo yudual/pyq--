@@ -1,10 +1,12 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEditPost } from "@/lib/edit-post-store";
 import { getCurrentUser } from "@/lib/auth";
 import { PublishModal } from "./TopBar";
+import { notifyContentUpdated } from "@/lib/content-sync";
 
 export default function EditPostModal() {
   const router = useRouter();
@@ -39,7 +41,7 @@ export default function EditPostModal() {
       editPost={post}
       onClose={close}
       onPublished={() => {
-        window.dispatchEvent(new CustomEvent("post-published"));
+        notifyContentUpdated();
       }}
     />
   );

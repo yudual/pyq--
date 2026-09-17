@@ -1,6 +1,8 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/refs */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { useRouter } from "next/navigation";
 import MomentCard from "@/components/MomentCard";
 import ArticleFeedCard from "@/components/ArticleFeedCard";
@@ -8,7 +10,9 @@ import ProjectCard from "@/components/ProjectCard";
 import { PostCardSkeleton, ArticleCardSkeleton } from "@/components/Skeleton";
 import { useSiteSettings } from "@/lib/site-settings-store";
 import { authFetchHeaders } from "@/lib/auth";
+import { subscribeContentUpdated } from "@/lib/content-sync";
 import type { Post } from "@/lib/mock-data";
+
 
 export function FeedDispatcher({ post, index }: { post: Post; index: number }) {
   if (post.category === "项目" || post.type === "project") {
@@ -126,10 +130,9 @@ export default function PostList({
         }
       });
 
-    return () => {
-      controller.abort();
-    };
-  }, [filterParams, initialError, initialPosts]);
+    // 故意忽略 initialPosts：仅在分类或筛选参数变更时重置列表，避免 props 更新触发 setPosts([]) 引起闪屏和竞态
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterParams, initialError]);
 
   const retryFirstPage = useCallback(async () => {
     retryAbortRef.current?.abort();
@@ -160,8 +163,18 @@ export default function PostList({
     }
   }, [filterParams]);
 
+  // 当服务端 ISR 完成重生成或路由重载传入新 initialPosts 时，同步更新客户端列表状态
+  useEffect(() => {
+    if (activeCategory === (category || "")) {
+      setPosts(initialPosts);
+      setPage(initialPage);
+      setHasMore(initialHasMore);
+      setError(initialError);
+    }
+  }, [initialPosts, initialHasMore, initialPage, initialError, activeCategory, category]);
+
   // 发布/编辑后的即时刷新由客户端重新拉取数据和 router.refresh() 完成；
-  // 缓存失效由后端的服务端 revalidate 回调处理，不向浏览器暴露密钥。
+  // 缓存失效由后端的服务端 revalidate 回调处理，同时支持 BroadcastChannel 跨标签页即时同步。
   useEffect(() => {
     const refreshFirstPage = async () => {
       refreshAbortRef.current?.abort();
@@ -202,20 +215,32 @@ export default function PostList({
       router.refresh();
     };
 
-    // 页面重新可见时（从其他标签页切回、从后台切回）刷新数据，
-    // 确保在文章详情页评论/点赞后返回首页时立即同步
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
+    // 跨标签页 BroadcastChannel 与当前窗口 CustomEvent 双通道监听
+    const unsubscribe = subscribeContentUpdated(handler);
+
+    // 页面重新可见或窗口重新获得焦点时（从其他标签页切回、从后台切回）静默刷新
+    const onVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
         refreshFirstPage();
       }
     };
 
-    window.addEventListener("post-published", handler);
-    document.addEventListener("visibilitychange", onVisibilityChange);
+    document.addEventListener("visibilitychange", onVisibilityOrFocus);
+    window.addEventListener("focus", onVisibilityOrFocus);
+
+    // 针对停留时间较长的读者，每 60 秒做一次轻量可见性静默轮询更新
+    const pollInterval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        refreshFirstPage();
+      }
+    }, 60000);
+
     return () => {
       refreshAbortRef.current?.abort();
-      window.removeEventListener("post-published", handler);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
+      unsubscribe();
+      document.removeEventListener("visibilitychange", onVisibilityOrFocus);
+      window.removeEventListener("focus", onVisibilityOrFocus);
+      clearInterval(pollInterval);
     };
   }, [filterParams, router]);
 

@@ -134,7 +134,7 @@ export default function FloatingNav() {
       {showPublish && token && (
         <PublishModal
           token={token}
-          defaultCategory="岁岁念"
+          defaultCategory="日常"
           onClose={() => setShowPublish(false)}
           onPublished={() => {
             setShowPublish(false);

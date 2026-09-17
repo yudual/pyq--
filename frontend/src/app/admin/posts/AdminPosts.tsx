@@ -1,17 +1,18 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { Trash2, Pin, PinOff, Heart, MessageSquare, ExternalLink, Plus } from "lucide-react";
+import { Trash2, Pin, PinOff, Heart, MessageSquare, ExternalLink, Plus, PenLine, Loader2 } from "lucide-react";
 import { apiFetch, getToken } from "@/lib/api-fetch";
 import { Post } from "@/lib/mock-data";
 import PostCard from "@/components/PostCard";
 import { PostCardSkeleton } from "@/components/Skeleton";
 import { useSiteSettings } from "@/lib/site-settings-store";
 import { PublishModal } from "@/components/TopBar";
+import { notifyContentUpdated } from "@/lib/content-sync";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 interface AdminPostsProps {
   defaultCategory?: string;
@@ -26,7 +27,9 @@ export default function AdminPosts({
 }: AdminPostsProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>(defaultCategory);
+  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
   const [showPublish, setShowPublish] = useState(false);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [page] = useState(1);
   const [, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,6 +37,7 @@ export default function AdminPosts({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pinningId, setPinningId] = useState<string | null>(null);
   const [permId, setPermId] = useState<string | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
   const token = getToken();
   const fetchSettings = useSiteSettings((s) => s.fetchSettings);
@@ -74,6 +78,7 @@ export default function AdminPosts({
       const res = await apiFetch(`/posts/${id}`, { method: "DELETE" });
       if (res.ok) {
         setPosts((prev) => prev.filter((p) => p.id !== id));
+        notifyContentUpdated();
       } else {
         alert("删除失败");
       }
@@ -97,6 +102,7 @@ export default function AdminPosts({
           prev.map((p) => (p.id === id ? { ...p, pinned: !currentPinned } : p))
         );
         fetchSettings();
+        notifyContentUpdated();
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data.message || "操作失败");
@@ -105,6 +111,31 @@ export default function AdminPosts({
       alert(err instanceof Error ? err.message : "操作失败");
     } finally {
       setPinningId(null);
+    }
+  };
+
+  const handleToggleStatus = async (id: string, currentStatus?: "published" | "draft") => {
+    const nextStatus = currentStatus === "draft" ? "published" : "draft";
+    setUpdatingStatusId(id);
+    try {
+      const res = await apiFetch(`/posts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (res.ok) {
+        setPosts((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: nextStatus } : p))
+        );
+        notifyContentUpdated();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.message || "状态切换失败");
+      }
+    } catch {
+      alert("网络错误，状态切换失败");
+    } finally {
+      setUpdatingStatusId(null);
     }
   };
 
@@ -124,6 +155,7 @@ export default function AdminPosts({
         setPosts((prev) =>
           prev.map((p) => (p.id === id ? { ...p, [field]: !currentVal } : p))
         );
+        notifyContentUpdated();
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data.message || "操作失败");
@@ -134,6 +166,37 @@ export default function AdminPosts({
       setPermId(null);
     }
   };
+
+  // 严格过滤掉长文文章与项目作品，仅保留动态/岁岁念
+  const momentPosts = useMemo(
+    () => posts.filter((p) => p.type !== "article" && p.type !== "project" && p.category !== "项目"),
+    [posts]
+  );
+
+  // 动态聚合分类列表，优先包含「日常」和「岁岁念」
+  const categoryTabs = useMemo(() => {
+    const catSet = new Set<string>(["日常", "岁岁念", "随想"]);
+    momentPosts.forEach((p) => {
+      if (p.category && p.category !== "项目") catSet.add(p.category.trim());
+    });
+    return [
+      { key: "all", label: "全部" },
+      ...Array.from(catSet).map((cat) => ({ key: cat, label: cat })),
+    ];
+  }, [momentPosts]);
+
+  const filteredPosts = useMemo(() => {
+    return momentPosts.filter((p) => {
+      // 状态筛选
+      if (statusFilter === "published" && p.status === "draft") return false;
+      if (statusFilter === "draft" && p.status !== "draft") return false;
+
+      // 分类筛选
+      if (selectedCategory === "all") return true;
+      if (selectedCategory === "岁岁念") return p.category === "岁岁念" || !p.category;
+      return p.category === selectedCategory;
+    });
+  }, [momentPosts, statusFilter, selectedCategory]);
 
   if (loading) {
     return (
@@ -160,15 +223,9 @@ export default function AdminPosts({
     );
   }
 
-  // 严格过滤掉长文文章与项目作品，仅保留动态/岁岁念
-  const momentPosts = posts.filter(
-    (p) => p.type !== "article" && p.type !== "project" && p.category !== "项目"
-  );
-  const filteredPosts = momentPosts.filter((p) => {
-    if (selectedCategory === "all") return true;
-    if (selectedCategory === "岁岁念") return p.category === "岁岁念" || !p.category;
-    return p.category === selectedCategory;
-  });
+  const publishedCount = momentPosts.filter((p) => p.status !== "draft").length;
+
+  const draftCount = momentPosts.filter((p) => p.status === "draft").length;
 
   return (
     <div className="space-y-4">
@@ -181,29 +238,6 @@ export default function AdminPosts({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {/* 分类快捷筛选 */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-adm-border bg-adm-card p-1">
-            {[
-              { key: "all", label: "全部" },
-              { key: "岁岁念", label: "岁岁念" },
-              { key: "日常", label: "日常" },
-              { key: "随想", label: "随想" },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setSelectedCategory(tab.key)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                  selectedCategory === tab.key
-                    ? "bg-adm-primary text-adm-primary-text shadow-xs"
-                    : "text-adm-text-secondary hover:text-adm-text"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
           {token && (
             <button
               type="button"
@@ -217,9 +251,55 @@ export default function AdminPosts({
         </div>
       </div>
 
+      {/* 筛选工具栏：状态切换与分类筛选 */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        {/* 状态筛选（全部 / 已发布 / 草稿箱） */}
+        <div className="flex items-center gap-1 rounded-xl border border-adm-border bg-adm-card p-1 self-start sm:self-auto">
+          {[
+            { key: "all", label: "全部", count: momentPosts.length },
+            { key: "published", label: "已发布", count: publishedCount },
+            { key: "draft", label: "草稿箱", count: draftCount },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setStatusFilter(tab.key as "all" | "published" | "draft")}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                statusFilter === tab.key
+                  ? "bg-adm-primary text-adm-primary-text shadow-xs"
+                  : "text-adm-text-secondary hover:text-adm-text"
+              }`}
+            >
+              {tab.label} ({tab.count})
+            </button>
+          ))}
+        </div>
+
+        {/* 分类快捷筛选 */}
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-adm-border bg-adm-card p-1 self-start sm:self-auto">
+          <span className="text-[11px] text-adm-text-secondary pl-1.5 pr-0.5">分类:</span>
+          {categoryTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setSelectedCategory(tab.key)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                selectedCategory === tab.key
+                  ? "bg-adm-primary text-adm-primary-text shadow-xs"
+                  : "text-adm-text-secondary hover:text-adm-text"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {filteredPosts.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-adm-border bg-adm-card py-12 text-center">
-          <p className="text-sm text-adm-text-tertiary">暂无该分类内容</p>
+          <p className="text-sm text-adm-text-tertiary">
+            {statusFilter === "draft" ? "草稿箱暂无内容" : "暂无该分类内容"}
+          </p>
         </div>
       ) : (
         <div className="gap-3 sm:columns-2">
@@ -231,22 +311,52 @@ export default function AdminPosts({
                 permId={permId}
                 pinningId={pinningId}
                 deletingId={deletingId}
+                updatingStatusId={updatingStatusId}
                 onDelete={handleDelete}
                 onPin={handlePin}
                 onTogglePerm={handleTogglePermission}
+                onToggleStatus={handleToggleStatus}
+                onEdit={async () => {
+                  try {
+                    const res = await apiFetch(`/posts/${post.id}`);
+                    if (res.ok) {
+                      const full = await res.json();
+                      setEditingPost(full);
+                      return;
+                    }
+                  } catch {
+                    // fallback
+                  }
+                  setEditingPost(post);
+                }}
               />
             </div>
           ))}
         </div>
       )}
 
+      {/* 发表动态弹窗：自动携带当前选中的分类标签（如点日常则默认日常） */}
       {showPublish && token && (
         <PublishModal
           token={token}
-          defaultCategory="岁岁念"
+          defaultCategory={selectedCategory !== "all" ? selectedCategory : "日常"}
           onClose={() => setShowPublish(false)}
           onPublished={() => {
             setShowPublish(false);
+            fetchPosts();
+          }}
+        />
+      )}
+
+      {/* 编辑已有动态/草稿弹窗 */}
+      {editingPost && token && (
+        <PublishModal
+          token={token}
+          editPost={editingPost}
+          defaultCategory={editingPost.category || "日常"}
+          onClose={() => setEditingPost(null)}
+          onPublished={() => {
+            setEditingPost(null);
             fetchPosts();
           }}
         />
@@ -261,17 +371,23 @@ function ActionBar({
   permId,
   pinningId,
   deletingId,
+  updatingStatusId,
   onDelete,
   onPin,
   onTogglePerm,
+  onToggleStatus,
+  onEdit,
 }: {
   post: Post;
   permId: string | null;
   pinningId: string | null;
   deletingId: string | null;
+  updatingStatusId: string | null;
   onDelete: (id: string) => void;
   onPin: (id: string, pinned: boolean) => void;
   onTogglePerm: (id: string, field: "likesDisabled" | "commentsDisabled", current: boolean) => void;
+  onToggleStatus: (id: string, currentStatus?: "published" | "draft") => void;
+  onEdit: () => void;
 }) {
   const isProject = post.category === "项目" || post.type === "project";
   const isArticle = post.type === "article";
@@ -282,63 +398,92 @@ function ActionBar({
     : `/moments/${post.shortId || post.id}`;
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-adm-border bg-adm-card-hover/40 px-4 py-2.5">
+    <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 border-t border-adm-border bg-adm-card-hover/40 px-3 sm:px-4 py-2.5">
+      {/* 预览入口 */}
       <Link
         href={canonicalUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text cursor-pointer"
+        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text cursor-pointer"
         title={`在前端预览${isProject ? "项目" : isArticle ? "文章" : "动态"}`}
       >
         <ExternalLink className="h-3.5 w-3.5" />
         预览
       </Link>
+
+      {/* 一键发布 / 下架切换 */}
+      <button
+        type="button"
+        onClick={() => onToggleStatus(post.id, post.status)}
+        disabled={updatingStatusId === post.id}
+        className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition cursor-pointer shrink-0 ${
+          post.status === "draft"
+            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300/40"
+            : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-300/40"
+        }`}
+        title={post.status === "draft" ? "一键发布此草稿" : "下架并转为草稿"}
+      >
+        {updatingStatusId === post.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+        <span>{post.status === "draft" ? "发布" : "下架"}</span>
+      </button>
+
+      {/* 编辑入口 */}
+      <button
+        type="button"
+        onClick={onEdit}
+        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text cursor-pointer"
+        title="编辑动态"
+      >
+        <PenLine className="h-3.5 w-3.5" />
+        编辑
+      </button>
+
       {!isProject && (
         <>
           <button
             onClick={() => onTogglePerm(post.id, "likesDisabled", !!post.likesDisabled)}
             disabled={permId === post.id}
             title={post.likesDisabled ? "已关闭点赞，点击开启" : "允许点赞，点击关闭"}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
               post.likesDisabled
                 ? "text-adm-danger bg-adm-danger-bg"
                 : "text-adm-text-secondary hover:bg-adm-card-hover"
             }`}
           >
             <Heart className="h-3.5 w-3.5" />
-            {post.likesDisabled ? "点赞已关" : "允许点赞"}
+            {post.likesDisabled ? "点赞关" : "点赞"}
           </button>
           <button
             onClick={() => onTogglePerm(post.id, "commentsDisabled", !!post.commentsDisabled)}
             disabled={permId === post.id}
             title={post.commentsDisabled ? "已关闭评论，点击开启" : "允许评论，点击关闭"}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
               post.commentsDisabled
                 ? "text-adm-danger bg-adm-danger-bg"
                 : "text-adm-text-secondary hover:bg-adm-card-hover"
             }`}
           >
             <MessageSquare className="h-3.5 w-3.5" />
-            {post.commentsDisabled ? "评论已关" : "允许评论"}
+            {post.commentsDisabled ? "评论关" : "评论"}
           </button>
         </>
       )}
-      <div className="mx-1 h-4 w-px bg-adm-border" />
+
       <button
         onClick={() => onPin(post.id, !!post.pinned)}
         disabled={pinningId === post.id}
-        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover disabled:opacity-50"
+        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover disabled:opacity-50"
       >
         {post.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-        {pinningId === post.id ? "处理中..." : post.pinned ? "取消置顶" : "置顶动态"}
+        {pinningId === post.id ? "..." : post.pinned ? "取消置顶" : "置顶"}
       </button>
       <button
         onClick={() => onDelete(post.id)}
         disabled={deletingId === post.id}
-        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-adm-danger transition-colors hover:bg-adm-danger-bg disabled:opacity-50"
+        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-adm-danger transition-colors hover:bg-adm-danger-bg disabled:opacity-50"
       >
         <Trash2 className="h-3.5 w-3.5" />
-        {deletingId === post.id ? "删除中..." : "删除动态"}
+        {deletingId === post.id ? "..." : "删除"}
       </button>
     </div>
   );

@@ -28,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
   try {
     const [settingsRes, ownerRes] = await Promise.all([
-      fetch(`${API_URL}/settings`, { next: { revalidate: 60 } }),
-      fetch(`${API_URL}/users/owner`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/settings`, { next: { revalidate: 60, tags: ["settings"] } }),
+      fetch(`${API_URL}/users/owner`, { next: { revalidate: 60, tags: ["owner"] } }),
     ]);
 
     if (settingsRes.ok) {
@@ -102,7 +102,7 @@ export default async function RootLayout({
   let fontFamily = "";
   let rssEnabled = true;
   try {
-    const settingsRes = await fetch(`${API_URL}/settings`, { next: { revalidate: 60 } });
+    const settingsRes = await fetch(`${API_URL}/settings`, { next: { revalidate: 60, tags: ["settings"] } });
     if (settingsRes.ok) {
       const settings = await settingsRes.json();
       if (settings.fontUrl && settings.fontFamily) {

@@ -404,6 +404,9 @@ interface CSTDateParts {
 
 function getCSTParts(iso: string): CSTDateParts {
   const date = new Date(iso);
+  if (isNaN(date.getTime())) {
+    return { year: 1970, month: 1, day: 1, hour: 0, minute: 0 };
+  }
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: CST_TIMEZONE,
     year: "numeric",
@@ -426,18 +429,6 @@ function getCSTParts(iso: string): CSTDateParts {
   };
 }
 
-/** 获取当前时间在 CST 时区的日期部分（用于"今天/昨天"判断） */
-function getCSTNowParts(): CSTDateParts {
-  return getCSTParts(new Date().toISOString());
-}
-
-/** 计算两个 CST 日期之间相差的天数（按自然日，非 24h 滚动） */
-function diffCSTDays(a: CSTDateParts, b: CSTDateParts): number {
-  const dateA = new Date(a.year, a.month - 1, a.day);
-  const dateB = new Date(b.year, b.month - 1, b.day);
-  return Math.round((dateB.getTime() - dateA.getTime()) / (24 * 60 * 60 * 1000));
-}
-
 export function formatWeChatDate(iso: string): string {
   const p = getCSTParts(iso);
   return `${p.year}年${p.month}月${p.day}日`;
@@ -445,6 +436,7 @@ export function formatWeChatDate(iso: string): string {
 
 export function formatRelativeTime(iso: string): string {
   const date = new Date(iso);
+  if (isNaN(date.getTime())) return "";
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
@@ -463,28 +455,24 @@ export function formatRelativeTime(iso: string): string {
 }
 
 /**
- * 详情页动态时间格式（微信朋友圈风格）
- * - 今天 → "今天 20:53"
- * - 昨天 → "昨天 20:53"
- * - 更早（同年）→ "4月27日 17:07"
- * - 更早（不同年）→ "2026年4月27日 17:07"
+ * 完整发布时间格式（精确到分）：YYYY-MM-DD HH:mm，如 "2026-09-17 13:40"
+ * 杜绝只展示模糊的“几分钟前”、“几天前”，让访客与博主明确获知真实发布时间。
+ */
+export function formatExactDateTime(iso?: string): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return "";
+  const p = getCSTParts(iso);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${p.year}-${pad(p.month)}-${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)}`;
+}
+
+/**
+ * 详情页动态时间格式：显示完整清晰的发布日期与时间
+ * 如 "2026-09-17 13:40"
  */
 export function formatDetailTime(iso: string): string {
-  const p = getCSTParts(iso);
-  const now = getCSTNowParts();
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  const hhmm = `${pad(p.hour)}:${pad(p.minute)}`;
-
-  const days = diffCSTDays(p, now);
-
-  if (days === 0) return `今天 ${hhmm}`;
-  if (days === 1) return `昨天 ${hhmm}`;
-
-  // 同年省略年份
-  if (p.year === now.year) {
-    return `${p.month}月${p.day}日 ${hhmm}`;
-  }
-  return `${p.year}年${p.month}月${p.day}日 ${hhmm}`;
+  return formatExactDateTime(iso);
 }
 
 /** 文章详情页时间格式：始终完整日期 "2026年2月11日 15:13"（不显示今天/昨天） */
@@ -493,6 +481,48 @@ export function formatArticleTime(iso: string): string {
   const pad = (n: number) => n.toString().padStart(2, "0");
   return `${p.year}年${p.month}月${p.day}日 ${pad(p.hour)}:${pad(p.minute)}`;
 }
+
+/**
+ * 将 ISO 日期字符串或 Date 转换为北京时间 CST (+08:00) 的 datetime-local 控件格式（YYYY-MM-DDTHH:mm）
+ */
+export function toDateTimeLocal(input?: string | Date): string {
+  if (input === undefined || input === null || input === "") {
+    const p = getCSTParts(new Date().toISOString());
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
+  }
+  const iso = typeof input === "string" ? input : input.toISOString();
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return "";
+  const p = getCSTParts(iso);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
+}
+
+/**
+ * 将 datetime-local 字符串按 CST 时区 (+08:00) 安全解析为标准 ISO 8601 UTC 字符串，若无效则返回 undefined
+ */
+export function toIsoDateString(val?: string | Date): string | undefined {
+  if (!val) return undefined;
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? undefined : val.toISOString();
+  }
+  const trimmed = val.trim();
+  if (!trimmed) return undefined;
+  const parts = trimmed.split("T");
+  if (parts.length !== 2) {
+    const d = new Date(trimmed);
+    return isNaN(d.getTime()) ? undefined : d.toISOString();
+  }
+  const [datePart, timePart] = parts;
+  const normalizedTime = timePart.length === 5 ? `${timePart}:00` : timePart;
+  const isoWithOffset = `${datePart}T${normalizedTime}+08:00`;
+  const d = new Date(isoWithOffset);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+/** 别名导出，确保语义明确一致 */
+export const parseDateTimeLocalToISO = toIsoDateString;
 
 const VIDEO_PLATFORM_LABELS: Record<string, string> = {
   douyin: "抖音",

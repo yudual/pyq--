@@ -21,6 +21,7 @@ import {
 import { apiFetch } from "@/lib/api-fetch";
 import { toAbsoluteUrl } from "@/lib/upload";
 import { formatArticleTime } from "@/lib/mock-data";
+import { notifyContentUpdated } from "@/lib/content-sync";
 
 interface ProjectListItem {
   id: string;
@@ -107,6 +108,7 @@ export default function AdminProjectsPage() {
       const res = await apiFetch(`/posts/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("删除失败");
       setProjects((prev) => prev.filter((p) => p.id !== id));
+      notifyContentUpdated();
     } catch (err) {
       alert(err instanceof Error ? err.message : "删除项目失败");
     } finally {
@@ -127,6 +129,7 @@ export default function AdminProjectsPage() {
       if (!res.ok) throw new Error("操作失败");
       const data = await res.json();
       setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, pinned: !!data.pinned } : p)));
+      notifyContentUpdated();
     } catch (err) {
       alert(err instanceof Error ? err.message : "操作失败");
     } finally {
@@ -145,6 +148,7 @@ export default function AdminProjectsPage() {
       });
       if (!res.ok) throw new Error("切换发布状态失败");
       setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, status: nextStatus } : p)));
+      notifyContentUpdated();
     } catch (err) {
       alert(err instanceof Error ? err.message : "状态切换失败");
     } finally {

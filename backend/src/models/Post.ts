@@ -88,9 +88,11 @@ interface PostAttributes {
   viewCount: number;
   /** 发布状态：published=已发布（默认），draft=草稿（不在前端显示） */
   status: "published" | "draft";
+  /** 发布时间（可自定义） */
+  createdAt?: Date;
 }
 
-interface PostCreationAttributes extends Optional<PostAttributes, "id" | "shortId" | "type" | "title" | "excerpt" | "cover" | "category" | "pinned" | "likesDisabled" | "commentsDisabled" | "ip" | "region" | "articleType" | "repostUrl" | "viewCount" | "status"> {}
+interface PostCreationAttributes extends Optional<PostAttributes, "id" | "shortId" | "type" | "title" | "excerpt" | "cover" | "category" | "pinned" | "likesDisabled" | "commentsDisabled" | "ip" | "region" | "articleType" | "repostUrl" | "viewCount" | "status" | "createdAt"> {}
 
 class Post
   extends Model<PostAttributes, PostCreationAttributes>
@@ -120,7 +122,7 @@ class Post
   declare repostUrl: string;
   declare viewCount: number;
   declare status: "published" | "draft";
-  declare readonly createdAt: Date;
+  declare createdAt: Date;
   declare readonly updatedAt: Date;
   // Association
   declare author?: User;

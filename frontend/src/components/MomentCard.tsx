@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useMemo, useSyncExternalStore, type CSSProperties } from "react";
 import { Music, Pause, Pin } from "lucide-react";
-import { Post, formatRelativeTime, getPostSourceLabel } from "@/lib/mock-data";
+import { Post, formatExactDateTime, getPostSourceLabel } from "@/lib/mock-data";
 import { resolveAvatar } from "@/lib/avatar";
 import { normalizeImages } from "@/lib/post-image";
 import { toHttps } from "@/lib/upload";
@@ -122,8 +122,8 @@ export default function MomentCard({
   const isAdmin = !!currentUser?.isLoggedIn;
   const canEdit = !!(
     currentUser?.isLoggedIn &&
-    ((post.author.email && currentUser.email && post.author.email === currentUser.email) ||
-      post.author.nickname === currentUser.nickname)
+    ((post.author?.email && currentUser.email && post.author.email === currentUser.email) ||
+      (post.author?.nickname && post.author.nickname === currentUser.nickname))
   );
 
   const normalizedImages = useMemo(() => normalizeImages(post.images), [post.images]);
@@ -310,8 +310,8 @@ export default function MomentCard({
     window.history.replaceState({}, "", window.location.pathname);
   }, [post.id]);
 
-  const displayName = post.author.nickname;
-  const authorAvatar = resolveAvatar(post.author.avatar, post.author.email || "", 96);
+  const displayName = post.author?.nickname || "用户";
+  const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
 
   return (
     <article
@@ -351,12 +351,17 @@ export default function MomentCard({
                   <Pin className="h-3 w-3 shrink-0 rotate-45 text-[#9a9a9a]" fill="currentColor" strokeWidth={2} />
                 )}
               </div>
-              <time className="block text-[11px] text-wechat-time">
-                {formatRelativeTime(post.createdAt)}
+              <time className="block text-[11px] text-wechat-time" title={post.createdAt}>
+                {formatExactDateTime(post.createdAt)}
               </time>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {post.status === "draft" && (
+              <span className="shrink-0 rounded bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-300/40">
+                草稿
+              </span>
+            )}
             {post.category && (
               <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/60 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
                 #{post.category}
@@ -396,6 +401,11 @@ export default function MomentCard({
               )}
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
+              {post.status === "draft" && (
+                <span className="shrink-0 rounded bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-300/40">
+                  草稿
+                </span>
+              )}
               {post.category && (
                 <span className="rounded-full bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
                   #{post.category}
@@ -407,6 +417,7 @@ export default function MomentCard({
                 </span>
               )}
             </div>
+
           </h3>
         )}
 
@@ -570,7 +581,7 @@ export default function MomentCard({
         {/* Time + action */}
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-[13px] text-wechat-time md:text-[14px]">
-            {!isCardVariant && <time>{formatRelativeTime(post.createdAt)}</time>}
+            {!isCardVariant && <time title={post.createdAt}>{formatExactDateTime(post.createdAt)}</time>}
             {(() => {
               const src = getPostSourceLabel(post);
               if (!src) return null;

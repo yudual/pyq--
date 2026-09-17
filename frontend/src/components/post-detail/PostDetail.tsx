@@ -79,11 +79,11 @@ export default function PostDetail({ post }: PostDetailProps) {
     const user = getCurrentUser();
     if (user?.isLoggedIn) {
       setIsAdmin(true);
-      const sameEmail = post.author.email && user.email && post.author.email === user.email;
-      const sameNickname = post.author.nickname === user.nickname;
-      setCanEdit(sameEmail || sameNickname);
+      const sameEmail = post.author?.email && user.email && post.author.email === user.email;
+      const sameNickname = post.author?.nickname && post.author.nickname === user.nickname;
+      setCanEdit(!!(sameEmail || sameNickname));
     }
-  }, [post.author.email, post.author.nickname]);
+  }, [post.author?.email, post.author?.nickname]);
 
   // 仅在挂载时（或 post.id 变化时）根据后端返回的 meLiked 推导 liked 初始值。
   // WP Ulike：meLiked 由后端基于 cookie visitorId/email/userId 判断，
@@ -260,8 +260,8 @@ export default function PostDetail({ post }: PostDetailProps) {
     }
   };
 
-  const displayName = post.author.nickname;
-  const authorAvatar = resolveAvatar(post.author.avatar, post.author.email || "", 96);
+  const displayName = post.author?.nickname || "用户";
+  const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
 
   const musicInfo = post.music ? formatMusicInfo(post.music) : null;
 
@@ -397,7 +397,7 @@ export default function PostDetail({ post }: PostDetailProps) {
         {/* Time + action */}
         <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-[13px] text-wechat-time md:text-[14px]">
-            <time>{formatDetailTime(post.createdAt)}</time>
+            <time title={post.createdAt}>{formatDetailTime(post.createdAt)}</time>
             {(() => {
               const src = getPostSourceLabel(post);
               if (!src) return null;

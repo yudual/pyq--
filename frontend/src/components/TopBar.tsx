@@ -40,15 +40,21 @@ import {
   Check,
   MoreVertical,
   Link2,
+  Calendar,
+  Clock,
+  FolderOpen,
+  Inbox,
 } from "lucide-react";
 import { cravatarUrl } from "@/lib/avatar";
 import { getGlobalAudio } from "@/lib/global-audio";
 import { useMusicPlayer } from "@/lib/music-player-store";
-import { Post, type PostLocation, type PostImage, type PostVideo, type PostDouban } from "@/lib/mock-data";
+import { Post, formatExactDateTime, toDateTimeLocal, toIsoDateString, type PostLocation, type PostImage, type PostVideo, type PostDouban } from "@/lib/mock-data";
 import { isLivePhoto, getImageSrc } from "@/lib/post-image";
 import { uploadAudio, uploadDirect, uploadImage, uploadVideo, toAbsoluteUrl, toHttps } from "@/lib/upload";
 import { PUBLIC_API_URL } from "@/lib/api-fetch";
+import { notifyContentUpdated } from "@/lib/content-sync";
 import { splitMotionPhoto } from "@/lib/motion-photo";
+
 import { useExitAnimation } from "@/lib/use-exit-animation";
 import RichTextEditor from "./RichTextEditor";
 import LazyImage from "./LazyImage";
@@ -590,6 +596,7 @@ export default function TopBar({ coverHeight = 300 }: TopBarProps) {
       {showPublish && loggedIn && (
         <PublishModal
           token={loggedIn.token}
+          defaultCategory="日常"
           onClose={() => setShowPublish(false)}
           onPublished={() => {
             // 不直接关闭弹窗，由 PublishModal 内部 handleClose 播放退出动画后关闭
@@ -909,6 +916,7 @@ export function LoginModal({
 }
 
 /* ========== Publish Modal (WeChat Moments Style) ========== */
+
 export function PublishModal({
   token,
   onClose,
@@ -924,14 +932,27 @@ export function PublishModal({
   defaultCategory?: string;
 }) {
   const isEdit = !!editPost;
+  const initialCategory = editPost?.category || (defaultCategory && defaultCategory !== "all" ? defaultCategory : "日常");
+  const [activePostId, setActivePostId] = useState<string | null>(editPost?.id || null);
+  const [activePostStatus, setActivePostStatus] = useState<"published" | "draft">(editPost?.status || "published");
+  const [publishTime, setPublishTime] = useState<string>(() => toDateTimeLocal(editPost?.createdAt));
+  const [showDraftBox, setShowDraftBox] = useState(false);
+  const [draftList, setDraftList] = useState<Post[]>([]);
+  const [draftListLoading, setDraftListLoading] = useState(false);
+  const [draftCount, setDraftCount] = useState(0);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
   const [content, setContent] = useState(editPost?.content ?? "");
-  const [category, setCategory] = useState<string>(editPost?.category || defaultCategory || "岁岁念");
+  const [category, setCategory] = useState<string>(initialCategory);
+  const [savingTarget, setSavingTarget] = useState<"published" | "draft" | null>(null);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const [draftSavedTime, setDraftSavedTime] = useState("");
   const [images, setImages] = useState<PostImage[]>(editPost?.images ?? []);
   const [uploading, setUploading] = useState(false);
   // 图片上传模式：normal=普通图片，live=实况图（需配对图片+视频），video=短视频
   const [uploadMode, setUploadMode] = useState<"normal" | "live" | "video">(
     editPost?.video ? "video" : "normal"
   );
+
   // 短视频：解析/上传/直链/嵌入
   const [video, setVideo] = useState<PostVideo | null>(editPost?.video ?? null);
   const [videoTab, setVideoTab] = useState<"parse" | "upload" | "url" | "embed">("parse");
@@ -1351,19 +1372,190 @@ export function PublishModal({
     }
   };
 
-  const handleSubmit = async () => {
+  // 本地草稿恢复（仅在新建模式下有效）
+  useEffect(() => {
+    if (isEdit || typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem("moment_publish_draft");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.content || (Array.isArray(parsed.images) && parsed.images.length > 0))) {
+          if (parsed.content) setContent(parsed.content);
+          if (Array.isArray(parsed.images) && parsed.images.length > 0) setImages(parsed.images);
+          if (parsed.category && (!defaultCategory || defaultCategory === "all")) setCategory(parsed.category);
+          if (parsed.location) setLocation(parsed.location);
+          if (parsed.music) setMusic(parsed.music);
+          if (parsed.linkCard) setLinkCard(parsed.linkCard);
+          if (parsed.video) {
+            setVideo(parsed.video);
+            setUploadMode("video");
+          }
+          if (parsed.douban) setDouban(parsed.douban);
+          if (parsed.updatedAt) {
+            const date = new Date(parsed.updatedAt);
+            setDraftSavedTime(`${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`);
+          }
+          setHasRestoredDraft(true);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [isEdit, defaultCategory]);
+
+  // 本地草稿自动保存（节流 800ms，仅在新建且有内容时保存）
+  useEffect(() => {
+    if (isEdit || typeof window === "undefined") return;
+    const timer = setTimeout(() => {
+      try {
+        if (!isContentEmpty(content) || images.length > 0 || video || music || linkCard || douban) {
+          localStorage.setItem(
+            "moment_publish_draft",
+            JSON.stringify({
+              content,
+              category,
+              images,
+              location,
+              music,
+              linkCard,
+              video,
+              douban,
+              updatedAt: Date.now(),
+            })
+          );
+        }
+      } catch {
+        // ignore
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [content, category, images, location, music, linkCard, video, douban, isEdit]);
+
+  const fetchDrafts = useCallback(async () => {
+    if (!token) return;
+    setDraftListLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/admin/posts?type=moment&status=draft&limit=50`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const items = (data.data || []).filter((p: any) => p.type !== "article" && p.type !== "project");
+        setDraftList(items);
+        setDraftCount(items.length);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setDraftListLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchDrafts();
+  }, [fetchDrafts]);
+
+  const handleLoadDraft = async (draft: Post) => {
+    let fullDraft = draft;
+    try {
+      const res = await fetch(`${API_URL}/posts/${draft.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        fullDraft = await res.json();
+      }
+    } catch {
+      // fallback to draft
+    }
+    setActivePostId(fullDraft.id);
+    setActivePostStatus("draft");
+    setContent(fullDraft.content || "");
+    setCategory(fullDraft.category || "日常");
+    setImages(Array.isArray(fullDraft.images) ? fullDraft.images : []);
+    setLocation(fullDraft.location || null);
+    setMusic(fullDraft.music || null);
+    setLinkCard(fullDraft.linkCard || null);
+    if (fullDraft.video) {
+      setVideo(fullDraft.video);
+      setUploadMode("video");
+    } else {
+      setVideo(null);
+      setUploadMode("normal");
+    }
+    setDouban(fullDraft.douban || null);
+    setLikesDisabled(!!fullDraft.likesDisabled);
+    setCommentsDisabled(!!fullDraft.commentsDisabled);
+    if (fullDraft.createdAt) {
+      setPublishTime(toDateTimeLocal(fullDraft.createdAt));
+    }
+    setShowDraftBox(false);
+    setSaveSuccessMsg("已载入草稿，可继续编辑或直接发布");
+    setTimeout(() => setSaveSuccessMsg(""), 3000);
+  };
+
+  const handleDeleteDraft = async (draftId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm("确定删除这条草稿吗？")) return;
+    try {
+      const res = await fetch(`${API_URL}/posts/${draftId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setDraftList((prev) => prev.filter((d) => d.id !== draftId));
+        setDraftCount((prev) => Math.max(0, prev - 1));
+        if (activePostId === draftId) {
+          setActivePostId(null);
+          setActivePostStatus("published");
+          setContent("");
+          setImages([]);
+          setLocation(null);
+          setMusic(null);
+          setLinkCard(null);
+          setVideo(null);
+          setDouban(null);
+        }
+        notifyContentUpdated();
+      } else {
+        alert("删除草稿失败");
+      }
+    } catch {
+      alert("删除草稿失败，网络错误");
+    }
+  };
+
+  const handleClearDraft = () => {
+    setContent("");
+    setImages([]);
+    setLocation(null);
+    setMusic(null);
+    setLinkCard(null);
+    setVideo(null);
+    setDouban(null);
+    setUploadMode("normal");
+    setCategory(defaultCategory && defaultCategory !== "all" ? defaultCategory : "日常");
+    setHasRestoredDraft(false);
+    setActivePostId(null);
+    setActivePostStatus("published");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("moment_publish_draft");
+    }
+  };
+
+  const handleSubmit = async (targetStatus: "published" | "draft" = "published") => {
     if (!hasPublishableContent) return;
     setSubmitting(true);
+    setSavingTarget(targetStatus);
     setError("");
+    setSaveSuccessMsg("");
     try {
-      const url = isEdit ? `${API_URL}/posts/${editPost!.id}` : `${API_URL}/posts`;
-      const method = isEdit ? "PUT" : "POST";
-      // 编辑模式：空值显式传 null/空数组/空字符串，否则 JSON.stringify 省略 undefined 字段，
-      // 后端收不到该字段就会保持原值，导致"删除内容后编辑无效"的 bug
-      // 视频独占：video 存在时 images 强制为 []
-      const payload = isEdit
+      const isUpdating = !!activePostId;
+      const url = isUpdating ? `${API_URL}/posts/${activePostId}` : `${API_URL}/posts`;
+      const method = isUpdating ? "PUT" : "POST";
+      const fallbackCat = defaultCategory && defaultCategory !== "all" ? defaultCategory : "日常";
+      const payload: Record<string, any> = isUpdating
         ? {
-            category: category.trim() || "",
+            category: category.trim() || fallbackCat,
             content: isContentEmpty(content) ? "" : content,
             images: uploadMode === "video" ? [] : (images.length > 0 ? images : []),
             location: location || null,
@@ -1373,9 +1565,11 @@ export function PublishModal({
             douban: douban || null,
             likesDisabled,
             commentsDisabled,
+            status: targetStatus,
+            createdAt: toIsoDateString(publishTime),
           }
         : {
-            category: category.trim() || "岁岁念",
+            category: category.trim() || fallbackCat,
             content: isContentEmpty(content) ? undefined : content,
             images: uploadMode === "video" ? [] : (images.length > 0 ? images : undefined),
             location: location || undefined,
@@ -1385,6 +1579,8 @@ export function PublishModal({
             douban: douban || undefined,
             likesDisabled,
             commentsDisabled,
+            status: targetStatus,
+            createdAt: toIsoDateString(publishTime),
           };
       const res = await fetch(url, {
         method,
@@ -1395,8 +1591,24 @@ export function PublishModal({
         body: JSON.stringify(payload),
       });
       if (res.ok) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("moment_publish_draft");
+        }
+        const resData = await res.json().catch(() => ({}));
+        notifyContentUpdated();
         onPublished();
-        handleClose();
+        fetchDrafts();
+
+        if (targetStatus === "draft") {
+          if (resData?.id) {
+            setActivePostId(resData.id);
+            setActivePostStatus("draft");
+          }
+          setSaveSuccessMsg("草稿已安全保存至草稿箱！");
+          setTimeout(() => setSaveSuccessMsg(""), 3500);
+        } else {
+          handleClose();
+        }
       } else if (res.status === 401) {
         localStorage.removeItem("admin_token");
         localStorage.removeItem("admin_nickname");
@@ -1406,13 +1618,34 @@ export function PublishModal({
         }, 1500);
       } else {
         const err = await res.json().catch(() => ({}));
-        setError(err.message || `${isEdit ? "保存" : "发表"}失败 (${res.status})`);
+        setError(err.message || `${targetStatus === "draft" ? "保存草稿" : isUpdating ? "保存" : "发表"}失败 (${res.status})`);
       }
     } catch {
-      setError("网络错误，发表失败");
+      setError("网络错误，操作失败");
     } finally {
       setSubmitting(false);
+      setSavingTarget(null);
     }
+  };
+
+  const handleCancel = () => {
+    if (activePostId) {
+      // 当前内容已在草稿箱安全持久化，直接退出
+      handleClose();
+      return;
+    }
+    if (!isEdit && hasPublishableContent) {
+      const confirmExit = window.confirm(
+        "确定退出编辑吗？\n\n- 点击「确定」：确认退出（未发表内容将被清空）\n- 点击「取消」：留在当前页面继续编辑\n\n💡 提示：若想保留内容以便后续发布，可直接点击右上角「存草稿」按钮。"
+      );
+      if (!confirmExit) {
+        return;
+      }
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("moment_publish_draft");
+      }
+    }
+    handleClose();
   };
 
   const activeImages = uploadMode === "video" ? [] : images;
@@ -1425,27 +1658,183 @@ export function PublishModal({
 
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div data-modal="overlay" className={`fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-0 md:items-center md:p-4 ${closing ? "animate-overlay-out" : "animate-overlay-in"}`} onPointerDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+    <div data-modal="overlay" className={`fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-0 md:items-center md:p-4 ${closing ? "animate-overlay-out" : "animate-overlay-in"}`} onPointerDown={(e) => { if (e.target === e.currentTarget) handleCancel(); }}>
       <div className={`relative flex h-full w-full flex-col bg-wechat-white md:h-auto md:min-h-[560px] md:max-h-[90vh] md:max-w-[680px] md:overflow-hidden md:rounded-2xl md:shadow-xl dark:bg-[#232328] ${closing ? "animate-sheet-down md:animate-modal-out" : "animate-sheet-up md:animate-modal-in"}`} onClick={(e) => e.stopPropagation()}>
       {/* Header */}
       <div className="sticky top-0 z-10 relative flex items-center justify-between border-b border-wechat-border bg-wechat-white px-4 py-3 rounded-t-2xl dark:bg-[#232328] dark:border-white/10">
         <button
-          onClick={handleClose}
-          className="text-sm font-medium text-wechat-text transition-colors hover:opacity-70 dark:text-gray-200"
+          onClick={handleCancel}
+          className="text-sm font-medium text-wechat-text transition-colors hover:opacity-70 dark:text-gray-200 cursor-pointer"
         >
           取消
         </button>
-        <button
-          onClick={handleSubmit}
-          disabled={submitting || !hasPublishableContent}
-          className="rounded-md px-4 py-1.5 text-sm font-medium transition-colors disabled:bg-wechat-bubble disabled:text-wechat-time enabled:bg-green-500 enabled:text-white enabled:hover:bg-green-600 dark:disabled:bg-white/5 dark:disabled:text-gray-500"
-        >
-          {submitting ? (isEdit ? "保存中" : "发表中") : isEdit ? "保存" : "发表"}
-        </button>
+
+        <div className="flex items-center gap-1.5">
+          {activePostStatus === "draft" && (
+            <span className="rounded bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300 border border-amber-300/40">
+              当前为草稿
+            </span>
+          )}
+          {hasRestoredDraft && (
+            <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+              已载入未发表草稿
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* 草稿箱按钮 */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowDraftBox(!showDraftBox);
+              if (!showDraftBox) fetchDrafts();
+            }}
+            className={`relative inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
+              showDraftBox
+                ? "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                : "border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10"
+            }`}
+            title="查看与载入历史草稿"
+          >
+            <FolderOpen className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <span>草稿箱</span>
+            {draftCount > 0 && (
+              <span className="rounded-full bg-amber-500 px-1.5 py-0.2 text-[10px] font-bold text-white leading-tight">
+                {draftCount}
+              </span>
+            )}
+          </button>
+
+          {/* 存草稿按钮 */}
+          <button
+            onClick={() => handleSubmit("draft")}
+            disabled={submitting || !hasPublishableContent}
+            className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {submitting && savingTarget === "draft" ? "保存中..." : "存草稿"}
+          </button>
+
+          {/* 发表 / 保存按钮 */}
+          <button
+            onClick={() => handleSubmit("published")}
+            disabled={submitting || !hasPublishableContent}
+            className="rounded-md px-3.5 py-1.5 text-xs sm:text-sm font-medium transition-colors disabled:bg-wechat-bubble disabled:text-wechat-time enabled:bg-green-500 enabled:text-white enabled:hover:bg-green-600 dark:disabled:bg-white/5 dark:disabled:text-gray-500 cursor-pointer"
+          >
+            {submitting && savingTarget === "published"
+              ? (activePostId ? "保存中..." : "发表中...")
+              : activePostId
+              ? (activePostStatus === "draft" ? "发布此草稿" : "保存")
+              : "发表"}
+          </button>
+        </div>
       </div>
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {/* 操作成功即时反馈条 */}
+        {saveSuccessMsg && (
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-50/90 dark:bg-emerald-950/40 px-3.5 py-2.5 text-xs text-emerald-800 dark:text-emerald-200 animate-fade-in">
+            <span className="font-medium">✅ {saveSuccessMsg}</span>
+            <button
+              type="button"
+              onClick={() => setSaveSuccessMsg("")}
+              className="text-emerald-700 dark:text-emerald-300 hover:opacity-75 cursor-pointer ml-2"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* 动态草稿箱面板 */}
+        {showDraftBox && (
+          <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-50/60 dark:bg-amber-950/20 p-3.5 animate-fade-in">
+            <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-200">
+                <FolderOpen className="h-4 w-4" />
+                <span>岁岁念草稿箱 ({draftList.length})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDraftBox(false)}
+                className="text-amber-700 dark:text-amber-300 hover:opacity-75 text-xs cursor-pointer font-medium"
+              >
+                收起
+              </button>
+            </div>
+
+            <div className="mt-2.5 max-h-52 overflow-y-auto space-y-2 [scrollbar-width:thin]">
+              {draftListLoading ? (
+                <div className="py-4 text-center text-xs text-amber-700 dark:text-amber-300">
+                  正在加载草稿...
+                </div>
+              ) : draftList.length === 0 ? (
+                <div className="py-4 text-center text-xs text-neutral-500 dark:text-neutral-400">
+                  草稿箱空空如也，随时可在编辑时点击「存草稿」暂存。
+                </div>
+              ) : (
+                draftList.map((draft) => (
+                  <div
+                    key={draft.id}
+                    className={`flex items-center justify-between gap-2 rounded-lg border p-2.5 text-xs transition ${
+                      activePostId === draft.id
+                        ? "border-amber-500 bg-amber-100/60 dark:bg-amber-900/30"
+                        : "border-neutral-200/80 bg-white dark:border-white/10 dark:bg-neutral-800/80 hover:border-amber-400"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1 cursor-pointer" onClick={() => handleLoadDraft(draft)}>
+                      <p className="line-clamp-2 font-medium text-neutral-800 dark:text-neutral-200">
+                        {draft.content ? draft.content.replace(/<[^>]*>/g, "").trim() || "包含多媒体内容的动态" : "无文本内容"}
+                      </p>
+                      <div className="mt-1 flex items-center gap-2 text-[10px] text-neutral-400">
+                        <span>保存于 {formatExactDateTime(draft.createdAt)}</span>
+                        {draft.category && (
+                          <span className="rounded bg-neutral-100 dark:bg-neutral-700 px-1 py-0.2">
+                            #{draft.category}
+                          </span>
+                        )}
+                        {Array.isArray(draft.images) && draft.images.length > 0 && (
+                          <span>{draft.images.length} 张图片</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleLoadDraft(draft)}
+                        className="rounded-md bg-amber-500 text-white dark:bg-amber-600 px-2.5 py-1 text-[11px] font-medium hover:opacity-90 transition cursor-pointer"
+                      >
+                        {activePostId === draft.id ? "编辑中" : "载入"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteDraft(draft.id, e)}
+                        className="rounded p-1 text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                        title="删除草稿"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+        {/* 本地草稿恢复提示横幅 */}
+        {hasRestoredDraft && (
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-50/70 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+            <span>📝 已自动恢复上次未发布的草稿内容{draftSavedTime ? ` (${draftSavedTime})` : ""}</span>
+            <button
+              type="button"
+              onClick={handleClearDraft}
+              className="text-amber-600 dark:text-amber-400 hover:underline font-medium cursor-pointer"
+            >
+              清空草稿
+            </button>
+          </div>
+        )}
+
         {/* 频道边界清晰引导 */}
         <div className="mb-3 flex items-center justify-between rounded-xl border border-dashed border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2 text-xs text-neutral-600 dark:text-neutral-400">
           <span>💡 发布深度长文或开源项目？</span>
@@ -1483,7 +1872,8 @@ export function PublishModal({
         {/* 分类快捷药丸（仅属于动态/朋友圈维度的标签，与文章、项目严格分离） */}
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-wechat-time text-[11px]">归类：</span>
-          {["岁岁念", "日常", "随想", "随手拍", "摄影", "生活"].map((cat) => (
+          {["日常", "岁岁念", "随想", "随手拍", "摄影", "生活"].map((cat) => (
+
             <button
               key={cat}
               type="button"
@@ -2024,10 +2414,37 @@ export function PublishModal({
           </div>
         )}
 
-        {/* Location & Music — 微信朋友圈风格选项行 */}
+        {/* Options — 微信朋友圈风格选项行（发布时间、位置、音乐等） */}
         <div className="mt-4 border-t border-black/5 dark:border-white/5">
+          {/* Publication Time */}
+          <div className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 shrink-0 text-wechat-time" />
+              <div className="flex flex-col">
+                <span className="text-[15px] text-wechat-text dark:text-gray-200">发布时间</span>
+                <span className="text-[11px] text-wechat-time">精确指定动态发布日期与时间</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="datetime-local"
+                value={publishTime}
+                onChange={(e) => setPublishTime(e.target.value)}
+                className="rounded-lg border border-black/10 bg-white dark:bg-white/5 dark:border-white/10 px-2 py-1 text-xs text-wechat-text dark:text-gray-200 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setPublishTime(toDateTimeLocal(new Date()))}
+                className="rounded-lg border border-black/10 dark:border-white/10 px-2 py-1 text-[11px] text-wechat-time hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer transition-colors"
+                title="重置为当前实时时间"
+              >
+                设为现在
+              </button>
+            </div>
+          </div>
+
           {/* Location */}
-          <div className="flex items-center gap-3 py-3">
+          <div className="flex items-center gap-3 border-t border-black/5 py-3 dark:border-white/5">
             <MapPin className="h-5 w-5 shrink-0 text-wechat-time" />
             {location ? (
               <div className="flex min-w-0 flex-1 items-center justify-between">

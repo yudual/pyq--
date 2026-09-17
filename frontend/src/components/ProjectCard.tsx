@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight, Code2, ExternalLink, FolderGit2, Link2 } from "lucide-react";
-import { formatRelativeTime, type Post } from "@/lib/mock-data";
+import { formatExactDateTime, type Post } from "@/lib/mock-data";
 import { getImageSrc, extractFirstMarkdownImage } from "@/lib/post-image";
 import { resolveAvatar } from "@/lib/avatar";
 import { toAbsoluteUrl, toHttps } from "@/lib/upload";
@@ -227,7 +227,7 @@ export default function ProjectCard({ post, index, featured = false, variant = "
 
           {/* Time & actions */}
           <div className="mt-2.5 flex items-center justify-between text-[13px] text-wechat-time md:text-[14px]">
-            <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt)}</time>
+            <time dateTime={post.createdAt} title={post.createdAt}>{formatExactDateTime(post.createdAt)}</time>
             <Link
               href={detailHref}
               className="text-xs text-neutral-400 hover:text-emerald-600 dark:text-neutral-500 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
@@ -279,7 +279,7 @@ export default function ProjectCard({ post, index, featured = false, variant = "
       <div className={`flex min-w-0 flex-col p-5 sm:p-6 ${featured ? "xl:justify-center xl:p-9" : ""}`}>
         <div className="mb-4 flex items-center justify-between gap-3 text-xs text-neutral-400 dark:text-neutral-500">
           <span className="font-mono uppercase tracking-[0.16em]">{post.category || "作品"}</span>
-          <span>{formatRelativeTime(post.createdAt)}</span>
+          <span title={post.createdAt}>{formatExactDateTime(post.createdAt)}</span>
         </div>
 
         <h2 className={`font-semibold tracking-tight text-neutral-900 dark:text-white ${featured ? "text-2xl sm:text-3xl" : "text-xl"}`}>

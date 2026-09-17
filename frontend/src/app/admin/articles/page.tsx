@@ -4,11 +4,13 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { PenLine, Trash2, Loader2, FileText, ExternalLink, Pin, PinOff, Search, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
-import { toAbsoluteUrl } from "@/lib/upload";
 import { formatArticleTime } from "@/lib/mock-data";
+
 import { useSiteSettings } from "@/lib/site-settings-store";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
 import { resolveCoverImage } from "@/lib/post-image";
+import { notifyContentUpdated } from "@/lib/content-sync";
+
 
 interface ArticleListItem {
   id: string;
@@ -83,6 +85,7 @@ export default function AdminArticlesPage() {
         const res = await apiFetch(`/posts/${id}`, { method: "DELETE" });
         if (!res.ok) throw new Error("删除失败");
         setArticles((prev) => prev.filter((a) => a.id !== id));
+        notifyContentUpdated();
       } catch (err) {
         alert(err instanceof Error ? err.message : "删除失败");
       } finally {
@@ -108,6 +111,7 @@ export default function AdminArticlesPage() {
         setArticles((prev) =>
           prev.map((a) => (a.id === id ? { ...a, pinned: !!data.pinned } : a))
         );
+        notifyContentUpdated();
       } catch (err) {
         alert(err instanceof Error ? err.message : "操作失败");
       } finally {
@@ -131,6 +135,7 @@ export default function AdminArticlesPage() {
         setArticles((prev) =>
           prev.map((a) => (a.id === id ? { ...a, status: nextStatus } : a))
         );
+        notifyContentUpdated();
       } catch (err) {
         alert(err instanceof Error ? err.message : "状态切换失败");
       } finally {
@@ -139,6 +144,7 @@ export default function AdminArticlesPage() {
     },
     []
   );
+
 
   const filteredArticles = useMemo(() => {
     return articles.filter((a) => {

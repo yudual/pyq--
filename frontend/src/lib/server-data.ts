@@ -26,7 +26,7 @@ export const EMPTY_OWNER: User = {
 
 export async function fetchPostsPage(query: string): Promise<PostsPageResult> {
   try {
-    const res = await fetch(`${getApiUrl()}/posts?${query}`, { next: { revalidate: 10 } });
+    const res = await fetch(`${getApiUrl()}/posts?${query}`, { next: { revalidate: 10, tags: ["posts"] } });
     if (!res.ok) return EMPTY_PAGE;
     const json = await res.json();
     const rawData = Array.isArray(json?.data) ? json.data : [];
@@ -44,7 +44,7 @@ export async function fetchPostsPage(query: string): Promise<PostsPageResult> {
 
 export async function fetchOwner(): Promise<User> {
   try {
-    const res = await fetch(`${getApiUrl()}/users/owner`, { next: { revalidate: 10 } });
+    const res = await fetch(`${getApiUrl()}/users/owner`, { next: { revalidate: 10, tags: ["owner"] } });
     if (!res.ok) return EMPTY_OWNER;
     const json = await res.json();
     if (!json || typeof json !== "object") return EMPTY_OWNER;
@@ -56,10 +56,11 @@ export async function fetchOwner(): Promise<User> {
 
 export async function fetchSiteSettings(): Promise<Record<string, unknown> | null> {
   try {
-    const res = await fetch(`${getApiUrl()}/settings`, { next: { revalidate: 10 } });
+    const res = await fetch(`${getApiUrl()}/settings`, { next: { revalidate: 10, tags: ["settings"] } });
     if (!res.ok) return null;
     return await res.json();
   } catch {
     return null;
   }
 }
+

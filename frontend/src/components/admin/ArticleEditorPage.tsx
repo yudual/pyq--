@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowLeft,
   Loader2,
@@ -19,6 +20,9 @@ import {
   Upload,
   Sparkles,
   Eye,
+  Calendar,
+  Clock,
+  Trash2,
 } from "lucide-react";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MediaPicker from "@/components/MediaPicker";
@@ -29,7 +33,9 @@ import { htmlToMarkdown } from "@/lib/markdown";
 import { syncFrontmatterToMarkdown, type ArticleFrontmatter } from "@/lib/frontmatter";
 import { extractFirstMarkdownImage } from "@/lib/post-image";
 import { buildMusicEmbedHtml, buildLinkCardHtml, buildVideoEmbedHtml } from "@/components/editor/embed-utils";
-import type { PostMusic, PostVideo, LinkCard } from "@/lib/mock-data";
+import { notifyContentUpdated } from "@/lib/content-sync";
+import { formatExactDateTime, toDateTimeLocal, toIsoDateString, type PostMusic, type PostVideo, type LinkCard } from "@/lib/mock-data";
+
 
 interface ArticleEditorPageProps {
   articleId?: string;
@@ -70,7 +76,12 @@ interface GardenPost {
 
 export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps) {
   const router = useRouter();
-  const isEdit = !!articleId;
+  const [activeArticleId, setActiveArticleId] = useState<string | null>(articleId || null);
+  const isEdit = !!activeArticleId;
+
+  useEffect(() => {
+    if (articleId) setActiveArticleId(articleId);
+  }, [articleId]);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState(isEdit ? "" : DEFAULT_ARTICLE_TEMPLATE);
@@ -81,6 +92,10 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
   const [articleType, setArticleType] = useState<"original" | "repost" | "ai">("original");
   const [repostUrl, setRepostUrl] = useState("");
   const [currentStatus, setCurrentStatus] = useState<"published" | "draft">("published");
+  const [publishTime, setPublishTime] = useState<string>(() => toDateTimeLocal());
+  const [showDraftBox, setShowDraftBox] = useState(false);
+  const [draftArticles, setDraftArticles] = useState<any[]>([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState<null | "published" | "draft">(null);
@@ -98,6 +113,26 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
   const initialSnapshotRef = useRef<{ title: string; content: string; caption: string } | null>(null);
   const savedDraftRef = useRef(false);
 
+  const fetchDraftArticles = useCallback(async () => {
+    setLoadingDrafts(true);
+    try {
+      const res = await apiFetch("/admin/posts?type=article&status=draft&limit=50");
+      if (res.ok) {
+        const data = await res.json();
+        const list = (data.data || []).filter((item: any) => item.category !== "项目" && item.type !== "project");
+        setDraftArticles(list);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingDrafts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDraftArticles();
+  }, [fetchDraftArticles]);
+
   // 加载已存在的文章
   useEffect(() => {
     if (!articleId) return;
@@ -114,6 +149,9 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
         setCaption(cleanCaption);
         setCategory(data.category || "随笔");
         setCurrentStatus(data.status || "published");
+        if (data.createdAt) {
+          setPublishTime(toDateTimeLocal(data.createdAt));
+        }
 
         let mergedContent = data.content || "";
 
@@ -172,6 +210,12 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
     }
     if (fm.excerpt !== undefined && fm.excerpt !== prev.excerpt && typeof fm.excerpt === "string") {
       setCaption(fm.excerpt);
+    }
+    if (fm.date !== undefined && fm.date !== prev.date && typeof fm.date === "string") {
+      const parsed = new Date(fm.date);
+      if (!isNaN(parsed.getTime())) {
+        setPublishTime(toDateTimeLocal(parsed));
+      }
     }
     if (fm.articleType && fm.articleType !== prev.articleType && ["original", "repost", "ai"].includes(fm.articleType)) {
       setArticleType(fm.articleType as "original" | "repost" | "ai");
@@ -301,6 +345,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           repostUrl: articleType === "repost" ? repostUrl.trim() : undefined,
           pinned,
           status: targetStatus,
+          date: toIsoDateString(publishTime),
         });
 
         const body: Record<string, unknown> = {
@@ -317,14 +362,15 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           commentsDisabled,
           pinned,
           status: targetStatus,
+          createdAt: toIsoDateString(publishTime),
         };
 
-        let targetId = articleId;
-        if (isEdit) {
+        let targetId = activeArticleId;
+        if (isEdit && activeArticleId) {
           body.music = null;
           body.linkCard = null;
           body.video = null;
-          const res = await apiFetch(`/posts/${articleId}`, {
+          const res = await apiFetch(`/posts/${activeArticleId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -345,6 +391,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           }
           const created = await res.json();
           targetId = created.id;
+          setActiveArticleId(created.id);
         }
 
         setCurrentStatus(targetStatus);
@@ -354,13 +401,15 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           content: synchronizedContent,
           caption: caption.trim(),
         };
+        notifyContentUpdated();
+        fetchDraftArticles();
 
         if (options.stay) {
           setSaveFeedback({
             type: "success",
-            message: targetStatus === "draft" ? "草稿已安全保存" : "文章已成功发布并同步至前台",
+            message: targetStatus === "draft" ? "草稿已安全保存至草稿箱" : "文章已成功发布并同步至前台",
           });
-          if (!isEdit && targetId) {
+          if (targetId) {
             window.history.replaceState(null, "", `/admin/articles/${targetId}`);
           }
           setTimeout(() => setSaveFeedback(null), 3500);
@@ -386,9 +435,11 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
       likesDisabled,
       commentsDisabled,
       pinned,
+      publishTime,
       isEdit,
-      articleId,
+      activeArticleId,
       router,
+      fetchDraftArticles,
     ]
   );
 
@@ -493,6 +544,25 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
             )}
           </button>
 
+          {/* 草稿箱入口 */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowDraftBox(true);
+              fetchDraftArticles();
+            }}
+            className="flex items-center gap-1.5 rounded-xl border border-adm-border bg-adm-card px-3 py-2 text-xs font-medium text-adm-text-secondary hover:bg-adm-input transition-colors cursor-pointer"
+            title="查看草稿箱中的未发布文章"
+          >
+            <FolderOpen className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <span>草稿箱</span>
+            {draftArticles.length > 0 && (
+              <span className="rounded-full bg-amber-500 text-white px-1.5 py-0.2 text-[10px] font-bold">
+                {draftArticles.length}
+              </span>
+            )}
+          </button>
+
           {/* 存草稿（就地安全保存，不强制跳出编辑流程） */}
           <button
             type="button"
@@ -553,9 +623,9 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
         </div>
       )}
 
-      {/* 可展开的文章高级属性面板（分类、封面、创作类型、权限） */}
+      {/* 可展开的文章高级属性面板（分类、封面、创作类型、权限、发布时间） */}
       {showSettingsDrawer && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 rounded-2xl border border-adm-border bg-adm-card p-4 sm:p-5 shadow-xs animate-fade-in text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 rounded-2xl border border-adm-border bg-adm-card p-4 sm:p-5 shadow-xs animate-fade-in text-xs">
           {/* 1. 分类与标签 */}
           <div className="space-y-2">
             <label className="block font-semibold text-adm-text">文章分类</label>
@@ -798,6 +868,32 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
               </label>
             </div>
           </div>
+
+          {/* 5. 发布时间设置 */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block font-semibold text-adm-text flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>发布时间</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setPublishTime(toDateTimeLocal(new Date()))}
+                className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+              >
+                设为现在
+              </button>
+            </div>
+            <input
+              type="datetime-local"
+              value={publishTime}
+              onChange={(e) => setPublishTime(e.target.value)}
+              className="w-full rounded-lg border border-adm-border bg-adm-bg px-2.5 py-1.5 text-xs text-adm-text focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+            <p className="text-[10px] text-adm-text-tertiary leading-relaxed">
+              支持精确指定发布时间（年月日及分秒），前台及文章卡片将如实显示此时间。
+            </p>
+          </div>
         </div>
       )}
 
@@ -821,6 +917,97 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
         }}
         category="image"
       />
+
+      {/* 文章草稿箱弹窗 */}
+      {showDraftBox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-overlay-in">
+          <div className="relative w-full max-w-lg rounded-2xl border border-adm-border bg-adm-card p-5 shadow-2xl max-h-[85vh] flex flex-col animate-modal-in">
+            <div className="flex items-center justify-between pb-3 border-b border-adm-border">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <h3 className="font-bold text-sm text-adm-text">文章草稿箱 ({draftArticles.length})</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDraftBox(false)}
+                className="rounded-lg p-1 text-adm-text-secondary hover:bg-adm-input cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-3 space-y-2.5 [scrollbar-width:thin]">
+              {loadingDrafts ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-adm-text-tertiary" />
+                </div>
+              ) : draftArticles.length === 0 ? (
+                <div className="py-12 text-center text-xs text-adm-text-tertiary">
+                  草稿箱空空如也，随时可在编辑时点击「存草稿」暂存文章。
+                </div>
+              ) : (
+                draftArticles.map((draft) => (
+                  <div
+                    key={draft.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-adm-border/80 bg-adm-bg/60 p-3 hover:bg-adm-input/40 transition"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate font-semibold text-xs text-adm-text">
+                          {draft.title || "无标题草稿"}
+                        </span>
+                        {draft.category && (
+                          <span className="rounded bg-neutral-200 dark:bg-neutral-800 px-1.5 py-0.2 text-[10px] text-neutral-600 dark:text-neutral-400">
+                            {draft.category}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 line-clamp-1 text-[11px] text-adm-text-secondary">
+                        {draft.excerpt || draft.content || "暂无描述"}
+                      </p>
+                      <span className="mt-1 block text-[10px] text-adm-text-tertiary">
+                        保存时间：{formatExactDateTime(draft.createdAt)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Link
+                        href={`/admin/articles/${draft.id}`}
+                        onClick={() => setShowDraftBox(false)}
+                        className="rounded-lg bg-adm-primary px-2.5 py-1 text-xs font-medium text-adm-primary-text hover:opacity-90 transition cursor-pointer"
+                      >
+                        继续编辑
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!confirm("确定彻底删除此草稿？")) return;
+                          try {
+                            const res = await apiFetch(`/posts/${draft.id}`, { method: "DELETE" });
+                            if (res.ok) {
+                              setDraftArticles((prev) => prev.filter((d) => d.id !== draft.id));
+                              if (draft.id === activeArticleId) {
+                                setActiveArticleId(null);
+                                window.history.replaceState(null, "", "/admin/articles/new");
+                              }
+                              notifyContentUpdated();
+                            }
+                          } catch {
+                            alert("删除失败");
+                          }
+                        }}
+                        className="rounded-lg p-1.5 text-adm-text-tertiary hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 cursor-pointer transition"
+                        title="删除草稿"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

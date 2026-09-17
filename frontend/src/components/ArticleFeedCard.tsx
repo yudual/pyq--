@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Calendar, Eye, Clock, ArrowRight, Folder, Pin, BookOpen, Heart, MessageSquare } from "lucide-react";
-import { Post, formatRelativeTime } from "@/lib/mock-data";
+import { Post, formatExactDateTime } from "@/lib/mock-data";
 import { toAbsoluteUrl } from "@/lib/upload";
 import { useSiteSettings } from "@/lib/site-settings-store";
 import { resolveAvatar } from "@/lib/avatar";
@@ -65,8 +65,7 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
   const readMinutes = Math.max(1, Math.ceil(charCount / 350));
 
   const typeBadge = ARTICLE_TYPE_BADGES[post.articleType || "original"] || ARTICLE_TYPE_BADGES.original;
-  const formattedDate = formatDisplayDate(post.createdAt);
-  const relativeDate = formatRelativeTime(post.createdAt);
+  const exactDateTime = formatExactDateTime(post.createdAt);
   const authorName = post.author?.nickname || "博主";
 
   if (variant === "feed") {
@@ -156,7 +155,7 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
 
           {/* Time & canonical detail action */}
           <div className="mt-2.5 flex items-center justify-between text-[13px] text-wechat-time md:text-[14px]">
-            <time dateTime={post.createdAt}>{relativeDate}</time>
+            <time dateTime={post.createdAt} title={post.createdAt}>{exactDateTime}</time>
             <Link
               href={detailUrl}
               className="text-xs text-neutral-400 hover:text-emerald-600 dark:text-neutral-500 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
@@ -199,13 +198,13 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
                 {typeBadge.label}
               </span>
 
-              {formattedDate && (
+              {exactDateTime && (
                 <span
                   className="inline-flex items-center gap-1 text-neutral-500 dark:text-neutral-400"
-                  title={`${formattedDate} (${relativeDate})`}
+                  title={post.createdAt}
                 >
                   <Calendar className="h-3 w-3" />
-                  <time dateTime={post.createdAt}>{formattedDate}</time>
+                  <time dateTime={post.createdAt}>{exactDateTime}</time>
                 </span>
               )}
 

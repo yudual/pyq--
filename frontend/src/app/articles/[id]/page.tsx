@@ -22,7 +22,7 @@ async function getPost(id: string): Promise<Post | null> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}/posts/${id}`, {
-      next: { revalidate: 10 },
+      next: { revalidate: 10, tags: ["posts"] },
     });
   } catch (err) {
     throw new Error(`网络请求失败: ${err instanceof Error ? err.message : String(err)}`);

@@ -5,23 +5,29 @@
  */
 export async function triggerRevalidate(paths?: string[]): Promise<void> {
   try {
-    const clientUrl = (process.env.FRONTEND_REVALIDATE_URL || process.env.CLIENT_URL || "http://localhost:3000").split(",")[0].trim();
-    const secret = process.env.REVALIDATE_SECRET;
-    if (!secret) {
-      console.warn("Revalidation skipped: REVALIDATE_SECRET is not configured.");
-      return;
-    }
+    const clientUrl = (
+      process.env.FRONTEND_INTERNAL_URL ||
+      process.env.FRONTEND_REVALIDATE_URL ||
+      "http://127.0.0.1:3000"
+    ).split(",")[0].trim();
+    const secret = process.env.REVALIDATE_SECRET || "kanle-revalidate";
+    const mergedPaths = Array.from(new Set(["/", ...(paths || [])]));
     const body: Record<string, any> = {
       secret,
-      paths,
-      path: paths?.[0],
+      paths: mergedPaths,
+      path: mergedPaths[0],
     };
-    await fetch(`${clientUrl}/api/revalidate`, {
+    const res = await fetch(`${clientUrl}/api/revalidate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-  } catch {
-    // 静默失败：重验证失败不影响 API 正常响应
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.warn(`Revalidation failed with status ${res.status}: ${txt}`);
+    }
+  } catch (err) {
+    console.warn("Revalidation request failed:", err);
   }
 }
+

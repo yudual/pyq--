@@ -36,7 +36,7 @@ export default async function Home() {
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">博客动态 · 岁岁念与随笔</span>
               <span className="rounded-full bg-neutral-200/70 dark:bg-neutral-700/70 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
-                {postsData.data.length} 条记录
+                {postsData.total ?? postsData.data.length} 条记录
               </span>
             </div>
             <span className="text-xs text-neutral-400 dark:text-neutral-500">
