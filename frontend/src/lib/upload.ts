@@ -1,4 +1,5 @@
 import { getApiUrl } from "./api-fetch";
+import { compressImage, type CompressOptions } from "./image-compress";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 const BASE_URL = API_URL.replace(/\/api$/, "");
@@ -12,6 +13,8 @@ export type DirectUploadPhase = "presign" | "put" | "confirm" | "network";
 export interface DirectUploadOptions {
   signal?: AbortSignal;
   onProgress?: (percent: number) => void;
+  /** 控制是否进行客户端压缩，传 false 关闭，或传具体压缩选项对象 */
+  compress?: boolean | CompressOptions;
 }
 
 export interface UploadedMedia {
@@ -92,7 +95,18 @@ export async function uploadDirect(
   kind: DirectUploadKind,
   options: DirectUploadOptions = {}
 ): Promise<UploadedMedia> {
-  const mimeType = normalizedMimeType(file);
+  // 图片直传前，在浏览器端进行智能高质无感压缩（若 options.compress !== false）
+  let uploadFile = file;
+  if (kind === "image" && options.compress !== false) {
+    try {
+      const compressOpts = typeof options.compress === "object" ? options.compress : undefined;
+      uploadFile = await compressImage(file, compressOpts);
+    } catch (e) {
+      console.warn("[uploadDirect] 自动压缩降级，继续使用原图:", e);
+    }
+  }
+
+  const mimeType = normalizedMimeType(uploadFile);
   const apiUrl = getApiUrl();
   let presign: Response;
   try {
@@ -102,7 +116,7 @@ export async function uploadDirect(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ filename: file.name, mimeType, kind }),
+      body: JSON.stringify({ filename: uploadFile.name, mimeType, kind }),
       signal: options.signal,
     });
   } catch {
@@ -114,7 +128,7 @@ export async function uploadDirect(
 
   const { intentId, uploadUrl, maxSize } = await presign.json();
   if (!intentId || !uploadUrl) throw new DirectUploadError("presign", "上传服务返回了无效的上传地址。");
-  if (Number(maxSize) > 0 && file.size > Number(maxSize)) {
+  if (Number(maxSize) > 0 && uploadFile.size > Number(maxSize)) {
     throw new DirectUploadError("presign", `文件大小超过 ${(Number(maxSize) / 1024 / 1024).toFixed(0)}MB 限制。`);
   }
 
@@ -124,7 +138,7 @@ export async function uploadDirect(
     put = await fetch(uploadUrl, {
       method: "PUT",
       headers: { "Content-Type": mimeType },
-      body: file,
+      body: uploadFile,
       signal: options.signal,
     });
   } catch {
