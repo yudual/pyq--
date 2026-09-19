@@ -328,9 +328,9 @@ export default function PostList({
 
   if (posts.length === 0) {
     return (
-      <div>
+      <div className="flex-1 flex flex-col w-full">
         {renderCategoryFilter()}
-        <div className="py-20 text-center px-4">
+        <div className="flex-1 flex flex-col items-center justify-center py-16 sm:py-20 text-center px-4">
           {error ? (
             <>
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-500 dark:bg-red-950/30 dark:text-red-400 mb-3">

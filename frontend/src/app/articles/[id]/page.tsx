@@ -72,11 +72,11 @@ export default async function ArticleDetailPage({
   }
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen flex flex-col overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
       {/* 居中自适应博客阅读容器与右侧目录 */}
-      <div className="relative mx-auto w-full max-w-[1440px] xl:max-w-[1600px] 2xl:max-w-[1720px] px-3 sm:px-6 lg:px-8 pt-18 sm:pt-24 pb-16 flex justify-center items-start gap-8 xl:gap-10">
+      <div className="relative mx-auto w-full flex-1 max-w-[1440px] xl:max-w-[1600px] 2xl:max-w-[1720px] px-3 sm:px-6 lg:px-8 pt-18 sm:pt-24 pb-12 flex justify-center items-start gap-8 xl:gap-10">
         <div className="w-full flex-1 min-w-0 max-w-[980px] xl:max-w-[1100px] 2xl:max-w-[1200px] flex flex-col">
           {/* 返回文章列表 */}
           <div className="mb-4 sm:mb-6">
@@ -94,7 +94,7 @@ export default async function ArticleDetailPage({
               <div className="flex-1">
                 <ArticleReader post={post} />
               </div>
-              <div className="mt-16">
+              <div className="mt-auto pt-16">
                 <Footer />
               </div>
             </ProfileFadeIn>

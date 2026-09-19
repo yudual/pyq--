@@ -9,7 +9,7 @@ import { useSiteSettings } from "@/lib/site-settings-store";
  * - 多行时第一行显示版权与感谢开源，第二行显示公安备案与工信部 ICP 备案，居中平铺
  * - 单行时自适应水平展开，避免折行乱码与错位
  */
-export default function Footer() {
+export default function Footer({ className = "" }: { className?: string } = {}) {
   const beian = useSiteSettings((s) => s.beian);
   const beianUrl = useSiteSettings((s) => s.beianUrl);
   const footerHtml = useSiteSettings((s) => s.footerHtml);
@@ -35,7 +35,7 @@ export default function Footer() {
   if (!loaded || (!footerHtml && !beian)) return null;
 
   return (
-    <footer className="w-full py-6 text-center text-xs text-neutral-400 dark:text-neutral-500 select-none">
+    <footer className={`w-full py-6 mt-auto text-center text-xs text-neutral-400 dark:text-neutral-500 select-none ${className}`}>
       <div className="mx-auto flex flex-col items-center justify-center gap-y-1.5 px-4 leading-relaxed">
         {isMultiLine ? (
           <>

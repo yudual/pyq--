@@ -101,10 +101,10 @@ export default async function ProjectDetailPage({
   const hasH1 = /^\s*#\s+/m.test(cleanContent);
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen flex flex-col overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
-      <div className="relative mx-auto w-full max-w-4xl min-w-0 px-3 sm:px-6 pt-18 sm:pt-24 pb-16">
+      <div className="relative mx-auto w-full flex-1 max-w-4xl min-w-0 px-3 sm:px-6 pt-18 sm:pt-24 pb-12">
         {/* 返回项目列表 */}
         <div className="mb-6 sm:mb-8">
           <Link
@@ -172,7 +172,7 @@ export default async function ProjectDetailPage({
               )}
             </div>
 
-            <div className="mt-16">
+            <div className="mt-auto pt-16">
               <Footer />
             </div>
           </ProfileFadeIn>

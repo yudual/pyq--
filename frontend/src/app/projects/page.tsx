@@ -29,7 +29,7 @@ export default async function ProjectsPage() {
   const projectData = await getProjectPosts();
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen flex flex-col overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
       <ChannelHeader
@@ -40,8 +40,8 @@ export default async function ProjectsPage() {
         maxWidth="max-w-6xl xl:max-w-7xl"
       />
 
-      <div className="relative mx-auto w-full max-w-6xl xl:max-w-7xl px-3 sm:px-6 pb-20">
-        <main className="relative w-full">
+      <div className="relative mx-auto w-full flex-1 flex flex-col max-w-6xl xl:max-w-7xl px-3 sm:px-6 pb-12">
+        <main className="relative w-full flex-1 flex flex-col">
           {/* 空状态由 PostList 统一渲染：「暂未发布项目内容」，引导说明：「发动态时选择分类为「项目」即可在此展现」 */}
           <PostList
             initialPosts={projectData.data}
@@ -51,12 +51,10 @@ export default async function ProjectsPage() {
             category="项目"
             layout="projects"
           />
-          <div className="mt-12">
-            <Footer />
-          </div>
         </main>
       </div>
 
+      <Footer />
       <FloatingActions />
       <DesktopFooter />
       <EditPostModal />

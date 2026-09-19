@@ -42,11 +42,11 @@ export default async function ProfilePage() {
   const coverUrls = getCoverList(settings, owner.cover);
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen flex flex-col overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
-      <div className="relative mx-auto w-full max-w-[640px] md:max-w-2xl lg:max-w-3xl px-3 sm:px-4 pt-20 sm:pt-24 pb-16">
-        <main className="relative w-full overflow-hidden rounded-3xl bg-wechat-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] border border-neutral-200/60 dark:border-neutral-800/80 pb-8 md:pb-12">
+      <div className="relative mx-auto w-full flex-1 flex flex-col max-w-[640px] md:max-w-2xl lg:max-w-3xl px-3 sm:px-4 pt-20 sm:pt-24 pb-12">
+        <main className="relative w-full flex-1 flex flex-col overflow-hidden rounded-3xl bg-wechat-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] border border-neutral-200/60 dark:border-neutral-800/80 pb-8 md:pb-12">
           <ProfileFadeIn>
             <CoverHeader user={owner} coverUrls={coverUrls} />
 

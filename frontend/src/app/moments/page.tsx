@@ -37,7 +37,7 @@ export default async function MomentsPage() {
   ]);
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen flex flex-col overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
       <ChannelHeader
@@ -48,8 +48,8 @@ export default async function MomentsPage() {
         maxWidth="max-w-[1400px] xl:max-w-[1560px] 2xl:max-w-[1680px]"
       />
 
-      <div className="relative mx-auto w-full max-w-[1400px] xl:max-w-[1560px] 2xl:max-w-[1680px] px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="flex justify-center items-start gap-6 xl:gap-8">
+      <div className="relative mx-auto w-full flex-1 flex flex-col max-w-[1400px] xl:max-w-[1560px] 2xl:max-w-[1680px] px-4 sm:px-6 lg:px-8 pb-12">
+        <div className="flex justify-center items-start gap-6 xl:gap-8 flex-1">
           {/* 桌面端左侧：个人信息与频道卡片 */}
           <MomentsLeftSidebar
             owner={owner}
@@ -74,9 +74,9 @@ export default async function MomentsPage() {
             recentArticles={recentArticles}
           />
         </div>
-        <Footer />
       </div>
 
+      <Footer />
       <FloatingActions />
       <DesktopFooter />
       <EditPostModal />

@@ -29,7 +29,7 @@ export default async function ArticlesPage() {
   const articlesData = await getArticles();
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen flex flex-col overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
       {/* 栏目头部 */}
@@ -42,8 +42,8 @@ export default async function ArticlesPage() {
       />
 
       {/* 博客化文章列表主体 */}
-      <div className="relative mx-auto w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl px-4 sm:px-6 lg:px-8 pb-20">
-        <main className="relative w-full">
+      <div className="relative mx-auto w-full flex-1 flex flex-col max-w-5xl xl:max-w-6xl 2xl:max-w-7xl px-4 sm:px-6 lg:px-8 pb-12">
+        <main className="relative w-full flex-1 flex flex-col">
           <PostList
             initialPosts={articlesData.data}
             initialHasMore={articlesData.hasMore}
@@ -51,12 +51,10 @@ export default async function ArticlesPage() {
             initialError={articlesData.error}
             type="article"
           />
-          <div className="mt-12">
-            <Footer />
-          </div>
         </main>
       </div>
 
+      <Footer />
       <FloatingActions />
       <DesktopFooter />
       <EditPostModal />

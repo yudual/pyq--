@@ -95,10 +95,10 @@ export default async function PostDetailPage({
   }
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen flex flex-col overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
-      <div className="relative mx-auto w-full max-w-[640px] md:max-w-2xl lg:max-w-3xl px-3 sm:px-4 pt-20 sm:pt-24 pb-16">
+      <div className="relative mx-auto w-full flex-1 max-w-[640px] md:max-w-2xl lg:max-w-3xl px-3 sm:px-4 pt-20 sm:pt-24 pb-12">
         {/* 返回动态列表 */}
         <div className="mb-4 sm:mb-6">
           <Link
