@@ -5,7 +5,9 @@
   "description": "YuBlog / Kanle Personal Blog",
   "scripts": {
     "dev": "node scripts/dev.js",
-    "dev:backend": "npm --prefix backend run dev",
+    "dev:fe": "cd frontend && pnpm dev",
+    "dev:be": "cd backend && pnpm dev",
+    "db:pull-remote": "node scripts/sync-db-from-remote.js",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix backend run build && npm --prefix frontend run build",
     "build:backend": "npm --prefix backend run build",
