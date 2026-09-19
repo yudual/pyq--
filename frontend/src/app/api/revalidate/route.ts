@@ -1,8 +1,29 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
+export const GET = POST;
+
 export async function POST(request: NextRequest) {
-  const { secret, path, paths } = await request.json();
+  let secret: string | undefined;
+  let path: string | undefined;
+  let paths: string[] | undefined;
+
+  try {
+    const body = await request.json();
+    secret = body?.secret;
+    path = body?.path;
+    paths = body?.paths;
+  } catch {
+    // 允许从 URL 查询参数中读取
+  }
+
+  if (!secret) {
+    secret = request.nextUrl.searchParams.get("secret") || undefined;
+  }
+  if (!path) {
+    path = request.nextUrl.searchParams.get("path") || undefined;
+  }
+
   const expected = process.env.REVALIDATE_SECRET;
   const validSecrets = new Set(
     [expected, "kanle-revalidate", "f7fb3f8826ca24262c8faaa81118defc6b2c38dc216527658561fef453105be7"].filter(Boolean)
