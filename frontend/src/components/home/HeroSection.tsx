@@ -94,6 +94,11 @@ export default function HeroSection({ owner, siteSettings }: HeroSectionProps) {
     );
   }, [allSocialLinks, HERO_ALLOWED_PLATFORMS]);
 
+  const [avatarSrc, setAvatarSrc] = useState(avatarUrl);
+  useEffect(() => {
+    setAvatarSrc(avatarUrl);
+  }, [avatarUrl]);
+
   const scrollToMoments = () => {
     const el = document.getElementById("moments-section");
     if (el) {
@@ -114,39 +119,40 @@ export default function HeroSection({ owner, siteSettings }: HeroSectionProps) {
   };
 
   return (
-    <section className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden px-6 pt-20 pb-24 sm:pb-20">
-      {/* 自定义主页背景封面（支持自有图床大图与随机轮播） */}
+    <section className="relative flex min-h-[50vh] sm:min-h-[56vh] lg:min-h-[60vh] w-full flex-col items-center justify-center overflow-hidden px-6 pt-24 sm:pt-28 pb-10 sm:pb-14">
+      {/* 自定义主页背景封面：移动端展示自适应封面，桌面端由全局单层壁纸 DesktopDecorations 统一定位，彻底解决两张背景因滚动层级不同产生的重影错位 */}
       {activeCover && (
-        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden md:hidden [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={toHttps(toAbsoluteUrl(activeCover))}
             alt="Hero Background"
-            className="h-full w-full object-cover opacity-25 dark:opacity-15 blur-[2px] scale-105 transition-opacity duration-1000"
+            className="h-full w-full object-cover opacity-25 dark:opacity-15 blur-[1.5px] scale-105 transition-opacity duration-1000"
           />
-          {/* 上层渐变遮罩，保证文字清晰可读且与全局背景温润融合 */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/85 to-wechat-white dark:from-neutral-950/70 dark:via-neutral-950/85 dark:to-[#191919]" />
+          {/* 上层柔和渐变遮罩，向下自然融进透明底色，绝不形成硬切白边 */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/50 via-white/20 to-transparent dark:from-neutral-950/50 dark:via-neutral-950/20 dark:to-transparent" />
         </div>
       )}
 
       {/* 极简柔和呼吸微光背景 (Glow Accent) */}
       <div
-        className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-[420px] w-[420px] sm:h-[560px] sm:w-[560px] rounded-full bg-gradient-to-tr from-sky-400/10 via-indigo-500/15 to-purple-500/10 dark:from-sky-500/10 dark:via-purple-600/15 dark:to-pink-500/10 blur-[100px] animate-hero-glow"
+        className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-[380px] w-[380px] sm:h-[500px] sm:w-[500px] rounded-full bg-gradient-to-tr from-sky-400/10 via-indigo-500/15 to-purple-500/10 dark:from-sky-500/10 dark:via-purple-600/15 dark:to-pink-500/10 blur-[100px] animate-hero-glow"
         aria-hidden="true"
       />
 
-      <div className="relative z-10 flex flex-col items-center text-center max-w-2xl mx-auto">
+      <div className="relative z-10 flex flex-col items-center text-center max-w-3xl mx-auto">
         {/* 头像展示 (含微光与微妙悬浮动效) */}
         <div className="group relative mb-6">
           <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-neutral-300 to-neutral-100 dark:from-neutral-700 dark:to-neutral-800 opacity-60 blur-sm group-hover:opacity-100 transition duration-500" />
           <div className="relative h-24 w-24 sm:h-28 sm:w-28 overflow-hidden rounded-full ring-2 ring-white dark:ring-neutral-800 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_40px_-10px_rgba(255,255,255,0.08)] bg-neutral-100 dark:bg-neutral-800">
             <Image
-              src={avatarUrl}
+              src={avatarSrc}
               alt={nickname}
               fill
               sizes="(max-width: 640px) 96px, 112px"
               priority
               unoptimized
+              onError={() => setAvatarSrc("/default-avatar.jpg")}
               className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
             />
           </div>
@@ -158,7 +164,7 @@ export default function HeroSection({ owner, siteSettings }: HeroSectionProps) {
         </h1>
 
         {/* 个性标语 / 身份宣言 */}
-        <p className="mt-4 text-base sm:text-lg text-neutral-500 dark:text-neutral-400 font-normal leading-relaxed max-w-md transition-colors">
+        <p className="mt-4 text-base sm:text-lg text-neutral-500 dark:text-neutral-400 font-normal leading-relaxed max-w-xl transition-colors">
           {bio}
         </p>
 
@@ -223,22 +229,24 @@ export default function HeroSection({ owner, siteSettings }: HeroSectionProps) {
             )}
           </div>
         )}
-      </div>
 
-      {/* 底部探索下滚提示 (动态微跳动) */}
-      <button
-        onClick={scrollToMoments}
-        type="button"
-        aria-label="向下探索"
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300 transition-colors cursor-pointer group"
-      >
-        <span className="text-xs tracking-wider uppercase opacity-70 group-hover:opacity-100 transition-opacity">
-          向下探索 · 岁岁念与随笔
-        </span>
-        <div className="animate-bounce-gentle">
-          <ChevronDown className="h-4 w-4" />
+        {/* 探索下滚引导 (以自然的间距承接下方动态流) */}
+        <div className="mt-8 mb-2 flex justify-center">
+          <button
+            onClick={scrollToMoments}
+            type="button"
+            aria-label="向下浏览随笔动态"
+            className="group flex flex-col items-center gap-1 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+          >
+            <span className="text-xs font-medium tracking-wide opacity-75 group-hover:opacity-100 transition-opacity">
+              向下浏览 · 随笔与动态
+            </span>
+            <div className="animate-bounce-gentle">
+              <ChevronDown className="h-4 w-4" />
+            </div>
+          </button>
         </div>
-      </button>
+      </div>
     </section>
   );
 }

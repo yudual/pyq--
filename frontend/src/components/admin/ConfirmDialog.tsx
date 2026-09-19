@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -26,27 +27,50 @@ export default function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const [visible, setVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const actionRef = useRef<"confirm" | "cancel">("cancel");
 
   const { closing, handleClose } = useExitAnimation(() => {
     setVisible(false);
-    if (actionRef.current === "confirm") onConfirm();
-    else onCancel();
-  }, 200);
+    setSubmitting(false);
+    if (actionRef.current === "confirm") {
+      onConfirm();
+    } else {
+      onCancel();
+    }
+  }, 180);
 
   useEffect(() => {
     if (open) {
       setVisible(true);
+      setSubmitting(false);
     } else if (visible && !closing) {
       setVisible(false);
     }
   }, [open, visible, closing]);
 
+  // Esc 键盘关闭支持
+  useEffect(() => {
+    if (!visible || closing) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        actionRef.current = "cancel";
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [visible, closing, handleClose]);
+
   if (typeof document === "undefined") return null;
-  if (!visible) return null;
+  if (!visible && !open) return null;
 
   const triggerClose = (action: "confirm" | "cancel") => {
+    if (submitting || closing) return;
     actionRef.current = action;
+    if (action === "confirm") {
+      setSubmitting(true);
+    }
     handleClose();
   };
 
@@ -64,25 +88,27 @@ export default function ConfirmDialog({
         }`}
       >
         <h3 className="text-base font-semibold text-adm-text">{title}</h3>
-        <p className="mt-2 text-sm text-adm-text-secondary">{message}</p>
+        <p className="mt-2 text-sm text-adm-text-secondary leading-relaxed">{message}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
             onClick={() => triggerClose("cancel")}
-            className="rounded-xl border border-adm-border px-4 py-2 text-sm text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
+            disabled={submitting}
+            className="rounded-xl border border-adm-border px-4 py-2 text-sm text-adm-text-secondary transition-colors hover:bg-adm-card-hover disabled:opacity-50 cursor-pointer"
           >
             {cancelText}
           </button>
           <button
             type="button"
             onClick={() => triggerClose("confirm")}
-            className={`rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors ${
+            disabled={submitting}
+            className={`rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors cursor-pointer disabled:opacity-50 ${
               danger
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-adm-primary hover:opacity-90"
             }`}
           >
-            {confirmText}
+            {submitting ? "处理中..." : confirmText}
           </button>
         </div>
       </div>

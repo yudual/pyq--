@@ -23,12 +23,12 @@ function resolveCover(url: string | undefined | null): string {
   return toHttps(toAbsoluteUrl(url));
 }
 
-function buildCover(post: Post, defaultCover: string): { kind: TileKind; cover: string; text: string } {
+function buildCover(post: Post): { kind: TileKind; cover: string; text: string } {
   const contentText = (post.content || "").replace(/<[^>]*>/g, "").trim();
 
-  // 文章与项目类型优先：用 cover 字段作为缩略图，无封面时回退到正文首图或站点默认封面
+  // 文章与项目类型优先：用 cover 字段作为缩略图，无封面时回退到正文首图，无首图则为纯文字
   if (post.type === "article" || post.category === "项目" || post.type === "project") {
-    return { kind: "article", cover: resolveCoverImage(post.cover, post.content, defaultCover), text: post.title || contentText };
+    return { kind: "article", cover: resolveCoverImage(post.cover, post.content), text: post.title || contentText };
   }
 
   if (post.images && post.images.length > 0) {
@@ -165,8 +165,7 @@ function DefaultCover({ kind }: { kind: Exclude<TileKind, "image" | "video" | "t
 
 export default function ProfilePostCard({ post }: ProfilePostCardProps) {
   const router = useRouter();
-  const defaultCover = useSiteSettings((s) => s.defaultCover);
-  const { kind, cover, text } = buildCover(post, defaultCover);
+  const { kind, cover, text } = buildCover(post);
 
   // 项目跳转到项目详情页，文章跳转到文章详情页，动态跳转到动态详情页
   const goDetail = () => {

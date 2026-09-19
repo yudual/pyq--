@@ -257,6 +257,23 @@ function formatPost(
       repostUrl: post.repostUrl || "",
       viewCount: post.viewCount || 0,
       status: post.status || "published",
+      collectionId: post.collectionId || null,
+      hideInHome: !!post.hideInHome,
+      collectionArticles: (post.collectionArticles || []).map((a: any) => ({
+        id: a.id,
+        shortId: a.shortId,
+        title: a.title || "",
+        excerpt: getExcerpt(a),
+        cover: a.cover || "",
+        category: a.category || "",
+        articleType: a.articleType || "original",
+        viewCount: a.viewCount || 0,
+        createdAt: a.createdAt,
+      })),
+      collection: post.belongingCollection
+        ? { id: post.belongingCollection.id, shortId: post.belongingCollection.shortId, title: post.belongingCollection.title }
+        : null,
+      collectionContext: post.collectionContext || null,
       author: post.author,
       comments: sortCommentsThreaded((post.comments || []).map((c: any) => {
         const likeData = commentLikesMap?.get(c.id);
@@ -304,8 +321,11 @@ router.get("/", authenticateOptional, async (req: AuthRequest, res: Response) =>
   }
 
   const typeParam = req.query.type as string;
-  if (typeParam === "article" || typeParam === "moment") {
+  if (typeParam === "article" || typeParam === "moment" || typeParam === "collection") {
     where.type = typeParam;
+  } else if (!typeParam) {
+    // 首页综合信息流：隐藏被合辑打包包含的子文章，由合辑卡片代表展示
+    where.hideInHome = false;
   }
   const categoryParam = req.query.category as string;
   if (categoryParam) {
@@ -381,6 +401,46 @@ router.get("/", authenticateOptional, async (req: AuthRequest, res: Response) =>
     // 补全无点赞记录的评论
     for (const id of allCommentIds) {
       if (!commentLikesMap.has(id)) commentLikesMap.set(id, { likeCount: 0, meLiked: false });
+    }
+  }
+
+  // 1. 批量关联合辑（type === "collection"）的子文章列表
+  const collectionPosts = posts.filter((p: any) => p.type === "collection");
+  if (collectionPosts.length > 0) {
+    const allChildIds = Array.from(
+      new Set(
+        collectionPosts.flatMap((cp: any) => {
+          const ids = typeof cp.collectionPostIds === "string" ? JSON.parse(cp.collectionPostIds) : cp.collectionPostIds;
+          return Array.isArray(ids) ? ids : [];
+        })
+      )
+    );
+    if (allChildIds.length > 0) {
+      const childArticles = await Post.findAll({
+        where: { id: { [Op.in]: allChildIds }, status: "published" },
+        attributes: ["id", "shortId", "title", "excerpt", "content", "cover", "category", "articleType", "viewCount", "createdAt"],
+      });
+      const childMap = new Map(childArticles.map((a: any) => [a.id, a]));
+      for (const cp of collectionPosts) {
+        const ids = typeof cp.collectionPostIds === "string" ? JSON.parse(cp.collectionPostIds) : cp.collectionPostIds;
+        (cp as any).collectionArticles = (Array.isArray(ids) ? ids : [])
+          .map((id: string) => childMap.get(id))
+          .filter(Boolean);
+      }
+    }
+  }
+
+  // 2. 批量关联子文章所属的合辑简要信息（如在文章专区等页面显示徽标）
+  const postsWithCollection = posts.filter((p: any) => p.collectionId);
+  if (postsWithCollection.length > 0) {
+    const colIds = Array.from(new Set(postsWithCollection.map((p: any) => p.collectionId)));
+    const cols = await Post.findAll({
+      where: { id: { [Op.in]: colIds } },
+      attributes: ["id", "shortId", "title"],
+    });
+    const colMap = new Map(cols.map((c: any) => [c.id, c]));
+    for (const p of postsWithCollection) {
+      (p as any).belongingCollection = colMap.get(p.collectionId) || null;
     }
   }
 
@@ -512,6 +572,53 @@ router.get("/:id", authenticateOptional, async (req: AuthRequest, res: Response)
     }
   }
 
+  // 1. 若自身为合辑，加载子文章列表
+  if (post.type === "collection") {
+    const ids = typeof post.collectionPostIds === "string" ? JSON.parse(post.collectionPostIds) : post.collectionPostIds;
+    if (Array.isArray(ids) && ids.length > 0) {
+      const childArticles = await Post.findAll({
+        where: { id: { [Op.in]: ids }, status: "published" },
+        attributes: ["id", "shortId", "title", "excerpt", "content", "cover", "category", "articleType", "viewCount", "createdAt"],
+      });
+      const childMap = new Map(childArticles.map((a: any) => [a.id, a]));
+      (post as any).collectionArticles = ids.map((id: string) => childMap.get(id)).filter(Boolean);
+    }
+  } else if (post.collectionId) {
+    // 2. 若属于某个合辑，加载所属合辑信息及前后篇导航
+    const col = await Post.findByPk(post.collectionId, {
+      attributes: ["id", "shortId", "title", "cover", "excerpt", "collectionPostIds"],
+    });
+    if (col) {
+      const ids = typeof col.collectionPostIds === "string" ? JSON.parse(col.collectionPostIds) : col.collectionPostIds;
+      if (Array.isArray(ids) && ids.length > 0) {
+        const siblings = await Post.findAll({
+          where: { id: { [Op.in]: ids }, status: "published" },
+          attributes: ["id", "shortId", "title", "viewCount", "createdAt"],
+        });
+        const siblingMap = new Map(siblings.map((s: any) => [s.id, s]));
+        const orderedSiblings = ids.map((cid: string) => siblingMap.get(cid)).filter(Boolean);
+        const currentIndex = orderedSiblings.findIndex((s: any) => s.id === post.id);
+        (post as any).collectionContext = {
+          collectionId: col.id,
+          collectionShortId: col.shortId,
+          collectionTitle: col.title,
+          posts: orderedSiblings.map((s: any, idx: number) => ({
+            id: s.id,
+            shortId: s.shortId,
+            title: s.title,
+            order: idx + 1,
+            isCurrent: s.id === post.id,
+          })),
+          currentIndex,
+          total: orderedSiblings.length,
+          prevPost: currentIndex > 0 ? { id: orderedSiblings[currentIndex - 1].id, shortId: orderedSiblings[currentIndex - 1].shortId, title: orderedSiblings[currentIndex - 1].title } : null,
+          nextPost: currentIndex >= 0 && currentIndex < orderedSiblings.length - 1 ? { id: orderedSiblings[currentIndex + 1].id, shortId: orderedSiblings[currentIndex + 1].shortId, title: orderedSiblings[currentIndex + 1].title } : null,
+        };
+        (post as any).belongingCollection = col;
+      }
+    }
+  }
+
   res.json(formatPost(post, meLiked, commentLikesMap));
 });
 
@@ -521,7 +628,7 @@ router.post(
   authenticate,
   requireAdmin,
   [
-    body("type").optional().isIn(["moment", "article"]),
+    body("type").optional().isIn(["moment", "article", "collection"]),
     body("title").optional().trim().isLength({ max: 200 }),
     body("excerpt").optional().trim().isLength({ max: 500 }),
     body("cover").optional().trim().isLength({ max: 512 }),
@@ -635,7 +742,7 @@ router.put(
   requireAdmin,
   [
     param("id").isUUID(),
-    body("type").optional().isIn(["moment", "article"]),
+    body("type").optional().isIn(["moment", "article", "collection"]),
     body("title").optional({ nullable: true }).trim().isLength({ max: 200 }),
     body("excerpt").optional({ nullable: true }).trim().isLength({ max: 500 }),
     body("cover").optional({ nullable: true }).trim().isLength({ max: 512 }),
@@ -719,25 +826,79 @@ router.delete(
   "/:id",
   authenticate,
   requireAdmin,
-  param("id").isUUID(),
   async (req: AuthRequest, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      res.status(400).json({ errors: errors.array() });
+    const idParam = String(req.params.id || "").trim();
+    if (!idParam) {
+      res.status(400).json({ message: "缺少待删除的内容 ID" });
       return;
     }
 
-    const post = await Post.findByPk(req.params.id as string);
-    if (!post) {
-      res.status(404).json({ message: "动态不存在" });
-      return;
-    }
+    try {
+      // 支持 UUID 或 shortId 查找
+      const post = await Post.findOne({
+        where: {
+          [Op.or]: [{ id: idParam }, { shortId: idParam }],
+        },
+      });
 
-    const deletedPath = getCanonicalPostPath(post);
-    await post.destroy();
-    // 触发首页与详情页 ISR 重生成，确保刷新页面看到最新动态
-    triggerRevalidate([deletedPath]);
-    res.status(204).send();
+      if (!post) {
+        res.status(404).json({ message: "内容不存在或已被删除" });
+        return;
+      }
+
+      const postId = post.id;
+      const deletedPath = getCanonicalPostPath(post);
+
+      // 1. 级联清理所有关联的评论点赞 (CommentLike) 和评论 (Comment)
+      const comments = await Comment.findAll({
+        where: { postId },
+        attributes: ["id"],
+      });
+      const commentIds = comments.map((c) => c.id);
+      if (commentIds.length > 0) {
+        await CommentLike.destroy({ where: { commentId: { [Op.in]: commentIds } } }).catch(() => {});
+        await Comment.destroy({ where: { id: { [Op.in]: commentIds } } }).catch(() => {});
+      }
+
+      // 2. 级联清理所有点赞 (Like)
+      await Like.destroy({ where: { postId } }).catch(() => {});
+
+      // 3. 处理系列合辑从属关系解绑
+      if (post.type === "collection") {
+        // 若自身为合辑卡片，将包含的子文章恢复独立展示
+        await Post.update(
+          { collectionId: null, hideInHome: false },
+          { where: { collectionId: postId } }
+        ).catch(() => {});
+      } else if (post.collectionId) {
+        // 若自身归属于某合辑，从该合辑的有序子文章 ID 列表中剔除
+        const parentCol = await Post.findOne({ where: { id: post.collectionId, type: "collection" } });
+        if (parentCol && parentCol.collectionPostIds) {
+          const oldIds: string[] = Array.isArray(parentCol.collectionPostIds) ? parentCol.collectionPostIds : [];
+          const nextIds = oldIds.filter((id) => id !== postId);
+          await parentCol.update({ collectionPostIds: nextIds }).catch(() => {});
+        }
+      }
+
+      // 4. 彻底删除文章/动态记录
+      await post.destroy();
+
+      // 5. 触发全站关键页面与自身详情页的 ISR 缓存失效，确保前台立即移除已删除内容
+      triggerRevalidate([
+        "/",
+        "/articles",
+        "/moments",
+        "/projects",
+        "/feed",
+        "/archives",
+        deletedPath,
+      ]).catch(() => {});
+
+      res.status(204).send();
+    } catch (err: any) {
+      console.error("[delete post error]:", err);
+      res.status(500).json({ message: err.message || "删除内容失败" });
+    }
   }
 );
 

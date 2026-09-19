@@ -128,9 +128,21 @@ export default function AdminLayoutClient({
     router.replace("/");
   };
 
+  const isItemActive = (itemHref: string) => {
+    if (itemHref === "/admin") {
+      return pathname === "/admin";
+    }
+    return pathname === itemHref || pathname.startsWith(itemHref + "/");
+  };
+
   // 当前页面标题
-  const currentNav = nav.find((n) => pathname === n.href || (n.href !== "/admin" && pathname.startsWith(n.href)));
+  const currentNav = nav.find((n) => isItemActive(n.href));
   const currentPageTitle = currentNav?.label || "管理后台";
+
+  // 文章编辑/创作全屏沉浸模式（避免双层 Header）
+  const isEditorPage =
+    pathname.startsWith("/admin/articles/new") ||
+    (/^\/admin\/articles\/[^/]+$/.test(pathname) && pathname !== "/admin/articles");
 
   return (
     <div className="min-h-screen bg-adm-bg">
@@ -176,7 +188,7 @@ export default function AdminLayoutClient({
                 {showItems && (
                   <div className="space-y-1">
                     {group.items.map((item) => {
-                      const active = pathname === item.href;
+                      const active = isItemActive(item.href);
                       const Icon = item.icon;
                       return (
                         <Link
@@ -202,87 +214,91 @@ export default function AdminLayoutClient({
         </div>
       </aside>
 
-      {/* Desktop top bar */}
-      <header className={`sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-adm-border bg-adm-card/80 px-6 backdrop-blur-xl transition-all duration-300 md:flex ${collapsed ? "md:ml-0" : "md:ml-60"}`}>
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text"
-            aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
-            title={collapsed ? "展开侧栏" : "收起侧栏"}
-          >
-            <PanelLeftClose className={`h-5 w-5 transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
-          </button>
-          <h1 className="shrink-0 text-sm font-semibold text-adm-text">{currentPageTitle}</h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Link
-            href="/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text"
-            title="前往首页"
-          >
-            <Home className="h-5 w-5" />
-          </Link>
-          <ThemeToggleButton />
-          <button
-            onClick={handleLogout}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-adm-danger transition-colors hover:bg-adm-danger-bg"
-            title="退出登录"
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
-        </div>
-      </header>
-
-      {/* Mobile header */}
-      <header className="sticky top-0 z-30 border-b border-adm-border bg-adm-card/90 backdrop-blur-xl md:hidden">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex min-w-0 items-center gap-2">
+      {/* Desktop top bar — 在全屏沉浸式文章创作/编辑页面隐藏，避免双层 Header */}
+      {!isEditorPage && (
+        <header className={`sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-adm-border bg-adm-card/80 px-6 backdrop-blur-xl transition-all duration-300 md:flex ${collapsed ? "md:ml-0" : "md:ml-60"}`}>
+          <div className="flex min-w-0 items-center gap-3">
             <button
-              onClick={() => setMobileNavOpen(true)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text"
-              aria-label="打开菜单"
+              onClick={() => setCollapsed(!collapsed)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text"
+              aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
+              title={collapsed ? "展开侧栏" : "收起侧栏"}
             >
-              <Menu className="h-5 w-5" />
+              <PanelLeftClose className={`h-5 w-5 transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
             </button>
-            <div className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg ${faviconUrl ? "border border-adm-border bg-adm-card" : "bg-adm-primary"}`}>
-              {faviconUrl ? (
-                <Image
-                  src={toAbsoluteUrl(faviconUrl)}
-                  alt={siteName}
-                  width={16}
-                  height={16}
-                  className="h-4 w-4 object-contain"
-                  unoptimized
-                />
-              ) : (
-                <PenLine className="h-4 w-4 text-adm-primary-text" />
-              )}
-            </div>
-            <span className="truncate text-sm font-semibold text-adm-text">{currentPageTitle}</span>
+            <h1 className="shrink-0 text-sm font-semibold text-adm-text">{currentPageTitle}</h1>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-2">
             <Link
               href="/"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text"
               title="前往首页"
             >
-              <Home className="h-4 w-4" />
+              <Home className="h-5 w-5" />
             </Link>
             <ThemeToggleButton />
             <button
               onClick={handleLogout}
-              className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-adm-danger hover:bg-adm-danger-bg"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-adm-danger transition-colors hover:bg-adm-danger-bg"
+              title="退出登录"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-5 w-5" />
             </button>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
+
+      {/* Mobile header — 在文章沉浸编辑页由专属 Header 代替 */}
+      {!isEditorPage && (
+        <header className="sticky top-0 z-30 border-b border-adm-border bg-adm-card/90 backdrop-blur-xl md:hidden">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                onClick={() => setMobileNavOpen(true)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text"
+                aria-label="打开菜单"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg ${faviconUrl ? "border border-adm-border bg-adm-card" : "bg-adm-primary"}`}>
+                {faviconUrl ? (
+                  <Image
+                    src={toAbsoluteUrl(faviconUrl)}
+                    alt={siteName}
+                    width={16}
+                    height={16}
+                    className="h-4 w-4 object-contain"
+                    unoptimized
+                  />
+                ) : (
+                  <PenLine className="h-4 w-4 text-adm-primary-text" />
+                )}
+              </div>
+              <span className="truncate text-sm font-semibold text-adm-text">{currentPageTitle}</span>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Link
+                href="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
+                title="前往首页"
+              >
+                <Home className="h-4 w-4" />
+              </Link>
+              <ThemeToggleButton />
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-adm-danger hover:bg-adm-danger-bg"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </header>
+      )}
 
       {/* Mobile slide-out drawer */}
       {mobileNavOpen && (
@@ -341,12 +357,13 @@ export default function AdminLayoutClient({
                     {showItems && (
                       <div className="space-y-1">
                         {group.items.map((item) => {
-                          const active = pathname === item.href;
+                          const active = isItemActive(item.href);
                           const Icon = item.icon;
                           return (
                             <Link
                               key={item.href}
                               href={item.href}
+                              onClick={mobileNav.handleClose}
                               className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
                                 active
                                   ? "bg-adm-primary font-medium text-adm-primary-text"
@@ -369,8 +386,14 @@ export default function AdminLayoutClient({
       )}
 
       {/* Main content — 边距随侧栏状态变化 */}
-      <main className={`px-4 py-4 pb-6 transition-all duration-300 md:py-5 md:pb-6 md:px-6 ${collapsed ? "md:ml-0" : "md:ml-60"}`}>
-        <div className="mx-auto max-w-6xl">{children}</div>
+      <main
+        className={
+          isEditorPage
+            ? `transition-all duration-300 ${collapsed ? "md:ml-0" : "md:ml-60"}`
+            : `px-4 py-4 pb-6 transition-all duration-300 md:py-5 md:pb-6 md:px-6 ${collapsed ? "md:ml-0" : "md:ml-60"}`
+        }
+      >
+        {isEditorPage ? children : <div className="mx-auto max-w-6xl">{children}</div>}
       </main>
 
       {/* Edit post modal (triggered from PostCard ActionMenu for admin) */}

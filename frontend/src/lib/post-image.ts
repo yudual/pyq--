@@ -47,12 +47,11 @@ export function extractFirstMarkdownImage(content?: string | null): string {
  * 解析文章或项目的封面图：
  * 优先级 1: 显式指定的封面 (post.cover)
  * 优先级 2: 正文中的第一张图片 (首图法则)
- * 优先级 3: 全局站点默认封面 (fallbackCover)
+ * 若无封面则返回空字符串，绝不自动填充站点背景大图
  */
 export function resolveCoverImage(
   explicitCover?: string | null,
-  content?: string | null,
-  fallbackCover?: string | null
+  content?: string | null
 ): string {
   if (explicitCover && explicitCover.trim()) {
     return toAbsoluteUrl(explicitCover.trim());
@@ -60,9 +59,6 @@ export function resolveCoverImage(
   const firstImage = extractFirstMarkdownImage(content);
   if (firstImage) {
     return toAbsoluteUrl(firstImage);
-  }
-  if (fallbackCover && fallbackCover.trim()) {
-    return toAbsoluteUrl(fallbackCover.trim());
   }
   return "";
 }

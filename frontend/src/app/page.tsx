@@ -21,15 +21,31 @@ export default async function Home() {
     fetchSiteSettings(),
   ]);
 
-  return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
-      <DesktopDecorations />
+  // 首页桌面端单层壁纸：优先使用 decorationImage，若未设置则回退至 backgroundImages 或 owner.cover，保证桌面端始终只有单层统一壁纸
+  let homepageBg = "";
+  if (typeof settings?.decorationImage === "string" && settings.decorationImage.trim()) {
+    homepageBg = settings.decorationImage.trim();
+  } else if (settings?.backgroundImages) {
+    try {
+      const parsed = typeof settings.backgroundImages === "string" ? JSON.parse(settings.backgroundImages) : settings.backgroundImages;
+      if (Array.isArray(parsed) && typeof parsed[0] === "string" && parsed[0].trim()) {
+        homepageBg = parsed[0].trim();
+      }
+    } catch {}
+  }
+  if (!homepageBg && typeof owner?.cover === "string" && owner.cover.trim()) {
+    homepageBg = owner.cover.trim();
+  }
 
-      {/* 1. 第一幕：极简质感出场 (Hero 100vh) */}
+  return (
+    <div id="scroll-root" className="relative min-h-screen overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
+      <DesktopDecorations image={homepageBg || undefined} />
+
+      {/* 1. 第一幕：典雅博主 Hero 展区 (轻盈透气，与全局背景自然融合) */}
       <HeroSection owner={owner} siteSettings={settings} />
 
-      {/* 2. 第二幕：微信朋友圈朴素动态流 */}
-      <div id="moments-section" className="relative mx-auto w-full max-w-2xl px-3 sm:px-4 pt-6 sm:pt-8 pb-20 scroll-mt-16 sm:scroll-mt-20">
+      {/* 2. 第二幕：博客动态流与长文聚合（大气宽屏画卷） */}
+      <div id="moments-section" className="relative mx-auto w-full max-w-4xl xl:max-w-5xl 2xl:max-w-6xl px-3 sm:px-6 lg:px-8 pt-0 sm:pt-2 pb-20 scroll-mt-20">
         <main className="relative w-full overflow-hidden rounded-3xl bg-wechat-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] border border-neutral-200/60 dark:border-neutral-800/80">
           {/* 动态卡片顶部栏 */}
           <div className="flex items-center justify-between border-b border-black/[0.05] dark:border-white/[0.06] px-5 py-3.5 bg-neutral-50/60 dark:bg-neutral-800/40">
@@ -54,8 +70,8 @@ export default async function Home() {
             initialPage={1}
             initialError={postsData.error}
           />
-          <Footer />
         </main>
+        <Footer />
       </div>
 
       {/* 悬浮操作与弹窗 */}

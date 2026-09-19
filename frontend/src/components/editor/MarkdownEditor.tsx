@@ -39,6 +39,7 @@ import {
   Loader2,
   HelpCircle,
   Sparkles,
+  Save,
   X,
 } from "lucide-react";
 import { markdownToHtml, copyToClipboard } from "@/lib/markdown";
@@ -66,6 +67,7 @@ export interface MarkdownEditorProps {
   className?: string;
   onFrontmatterChange?: (data: ArticleFrontmatter) => void;
   onSave?: () => void;
+  saving?: boolean;
 }
 
 export default function MarkdownEditor({
@@ -78,11 +80,13 @@ export default function MarkdownEditor({
   className = "",
   onFrontmatterChange,
   onSave,
+  saving = false,
 }: MarkdownEditorProps) {
   const [viewMode, setViewMode] = useState<"split" | "edit" | "preview">("split");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [customHeight, setCustomHeight] = useState<number | null>(null);
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
@@ -95,6 +99,17 @@ export default function MarkdownEditor({
   const [showCalloutMenu, setShowCalloutMenu] = useState(false);
   const [showHeadingMenu, setShowHeadingMenu] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onEsc = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [isFullscreen]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -251,16 +266,18 @@ export default function MarkdownEditor({
           ? localStorage.getItem("admin_token") || ""
           : "");
       if (!tokenToUse) {
-        alert("请先登录管理后台再上传图片");
+        setUploadError("请先登录管理后台再上传图片");
+        setTimeout(() => setUploadError(null), 4000);
         return;
       }
 
       setUploading(true);
+      setUploadError(null);
       const results: string[] = [];
       try {
         for (let i = 0; i < imageFiles.length; i++) {
           const file = imageFiles[i];
-          setUploadMessage(`正在上传图片 (${i + 1}/${imageFiles.length}): ${file.name}...`);
+          setUploadMessage(`正在上传 (${i + 1}/${imageFiles.length})：${file.name}`);
           const url = await uploadImage(file, tokenToUse);
           const altName = file.name.replace(/\.[^.]+$/, "").trim() || "图片";
           results.push(`![${altName}](${toAbsoluteUrl(url)})`);
@@ -269,7 +286,9 @@ export default function MarkdownEditor({
           insertBlock(results.join("\n\n"));
         }
       } catch (err: unknown) {
-        alert(err instanceof Error ? err.message : "图片上传失败");
+        const msg = err instanceof Error ? err.message : "图片上传失败";
+        setUploadError(msg);
+        setTimeout(() => setUploadError(null), 4000);
       } finally {
         setUploading(false);
         setUploadMessage("");
@@ -702,11 +721,11 @@ export default function MarkdownEditor({
                 onMouseLeave={() => setShowCalloutMenu(false)}
               >
                 {[
-                  { tag: "NOTE", label: "💡 提示 (Note)", color: "text-blue-600" },
-                  { tag: "TIP", label: "✨ 技巧 (Tip)", color: "text-emerald-600" },
-                  { tag: "IMPORTANT", label: "⭐ 重要 (Important)", color: "text-purple-600" },
-                  { tag: "WARNING", label: "⚠️ 警告 (Warning)", color: "text-amber-600" },
-                  { tag: "CAUTION", label: "🛑 危险 (Caution)", color: "text-rose-600" },
+                  { tag: "NOTE", label: "提示 (Note)", color: "text-blue-600 dark:text-blue-400" },
+                  { tag: "TIP", label: "技巧 (Tip)", color: "text-emerald-600 dark:text-emerald-400" },
+                  { tag: "IMPORTANT", label: "重点 (Important)", color: "text-purple-600 dark:text-purple-400" },
+                  { tag: "WARNING", label: "警告 (Warning)", color: "text-amber-600 dark:text-amber-400" },
+                  { tag: "CAUTION", label: "危险 (Caution)", color: "text-rose-600 dark:text-rose-400" },
                 ].map(({ tag, label, color }) => (
                   <button
                     key={tag}
@@ -842,7 +861,25 @@ export default function MarkdownEditor({
         </div>
 
         {/* 右侧：视图模式切换、语法速查与全屏 */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isFullscreen && onSave && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={onSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 px-3 py-1.5 text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-100 disabled:opacity-50 transition cursor-pointer"
+              title="保存草稿 (Ctrl+S)"
+            >
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
+              <span>{saving ? "保存中..." : "存草稿"}</span>
+            </button>
+          )}
+
           {/* 语法速查 */}
           <button
             type="button"
@@ -878,7 +915,7 @@ export default function MarkdownEditor({
                   ? "bg-white dark:bg-[#28282e] text-neutral-900 dark:text-white shadow-xs font-semibold"
                   : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
               }`}
-              title="分栏双屏实时预览 (ByteMD 经典交互)"
+              title="分栏双屏实时预览"
             >
               <Columns2 className="h-3.5 w-3.5" />
               <span>分栏</span>
@@ -903,10 +940,21 @@ export default function MarkdownEditor({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="rounded-lg p-1.5 text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-            title={isFullscreen ? "退出全屏" : "沉浸全屏写作"}
+            className={`flex items-center gap-1 rounded-lg p-1.5 text-xs font-medium transition cursor-pointer ${
+              isFullscreen
+                ? "bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-white px-2"
+                : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10"
+            }`}
+            title={isFullscreen ? "退出全屏 (Esc)" : "沉浸全屏写作"}
           >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="h-4 w-4" />
+                <span className="hidden sm:inline">退出全屏</span>
+              </>
+            ) : (
+              <Maximize2 className="h-4 w-4" />
+            )}
           </button>
         </div>
       </div>
@@ -926,6 +974,14 @@ export default function MarkdownEditor({
         <div className="absolute top-12 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full bg-neutral-900/90 dark:bg-white/90 px-4 py-1.5 text-xs font-medium text-white dark:text-neutral-900 shadow-lg backdrop-blur-xs animate-fade-in-up">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400 dark:text-emerald-600" />
           <span>{uploadMessage || "正在处理图片上传..."}</span>
+        </div>
+      )}
+
+      {/* 图片上传失败提示浮动条 */}
+      {uploadError && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full bg-rose-600 px-4 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-xs animate-fade-in-up">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <span>{uploadError}</span>
         </div>
       )}
 

@@ -29,7 +29,7 @@ export default async function ArticlesPage() {
   const articlesData = await getArticles();
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
       {/* 栏目头部 */}
@@ -38,11 +38,11 @@ export default async function ArticlesPage() {
         subtitle="深度长文、技术思考与随笔写作"
         icon="✍️"
         count={articlesData.total}
-        maxWidth="max-w-4xl lg:max-w-5xl"
+        maxWidth="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl"
       />
 
       {/* 博客化文章列表主体 */}
-      <div className="relative mx-auto w-full max-w-4xl lg:max-w-5xl px-4 sm:px-6 pb-20">
+      <div className="relative mx-auto w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl px-4 sm:px-6 lg:px-8 pb-20">
         <main className="relative w-full">
           <PostList
             initialPosts={articlesData.data}

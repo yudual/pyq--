@@ -46,8 +46,7 @@ function formatDisplayDate(dateStr?: string): string {
 
 export default function ArticleFeedCard({ post, index, variant = "standalone" }: ArticleFeedCardProps) {
   const detailUrl = `/articles/${post.shortId || post.id}`;
-  const defaultCover = useSiteSettings((s) => s.defaultCover);
-  const coverUrl = resolveCoverImage(post.cover, post.content, defaultCover);
+  const coverUrl = resolveCoverImage(post.cover, post.content);
 
   // 提取纯净正文摘要（自动消除 Frontmatter、HTML 标签与 Markdown 标记）
   let plainText = post.content ? stripMarkdownAndHtml(post.content) : "";
@@ -98,6 +97,11 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
               <span className="rounded-full bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
                 #{post.category || "文章"}
               </span>
+              {(post.collection?.title || post.collectionTitle) && (
+                <span className="rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 px-2 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                  系列: {post.collection?.title || post.collectionTitle}
+                </span>
+              )}
               {post.pinned && (
                 <span className="shrink-0 rounded-[4px] bg-[#ececec] px-2 py-0.5 text-[11px] font-medium leading-tight text-[#9a9a9a] dark:bg-white/[0.1] dark:text-[#9a9a9a]">
                   置顶
@@ -116,22 +120,18 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
           {/* 微信公众号长文卡片样式 */}
           <Link
             href={detailUrl}
-            className="group/card mt-2.5 flex w-full max-w-[360px] sm:max-w-[420px] items-stretch overflow-hidden rounded-xl border border-black/[0.06] bg-[#f7f7f7] transition-all duration-200 hover:bg-[#eaeaea] hover:border-black/10 dark:border-white/[0.08] dark:bg-[#25252b] dark:hover:bg-[#2e2e36] dark:hover:border-white/15"
+            className="group/card mt-2.5 flex w-full max-w-md sm:max-w-xl md:max-w-2xl items-stretch overflow-hidden rounded-xl border border-black/[0.06] bg-[#f7f7f7] transition-all duration-200 hover:bg-[#eaeaea] hover:border-black/10 dark:border-white/[0.08] dark:bg-[#25252b] dark:hover:bg-[#2e2e36] dark:hover:border-white/15"
           >
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden bg-black/5 dark:bg-white/5 sm:h-22 sm:w-22">
-              {coverUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
+            {coverUrl && (
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden bg-black/5 dark:bg-white/5 sm:h-22 sm:w-22">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={coverUrl}
                   alt={post.title || ""}
                   className="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-105"
                 />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-neutral-400">
-                  <BookOpen className="h-7 w-7" />
-                </div>
-              )}
-            </div>
+              </div>
+            )}
             <div className="flex min-w-0 flex-1 flex-col justify-between p-2.5 sm:p-3">
               <div>
                 <p className="line-clamp-1 text-sm font-semibold text-neutral-900 group-hover/card:text-emerald-700 dark:text-neutral-100 dark:group-hover/card:text-emerald-400">
@@ -191,6 +191,12 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
                 <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 dark:bg-neutral-800 px-2.5 py-0.5 font-medium text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700/60">
                   <Folder className="h-3 w-3 text-neutral-500 dark:text-neutral-400" />
                   {post.category}
+                </span>
+              )}
+
+              {(post.collection?.title || post.collectionTitle) && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200/70 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60 px-2.5 py-0.5 font-medium text-[11px]">
+                  📚 系列: {post.collection?.title || post.collectionTitle}
                 </span>
               )}
 

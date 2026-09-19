@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -162,11 +163,15 @@ export default function AdminFriends() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("确定删除这个友链吗？")) return;
-    const res = await apiFetch(`/friends/${id}`, {
-      method: "DELETE",
-    });
-    if (res.ok) fetchLinks();
+    setConfirmDeleteId(null);
+    try {
+      const res = await apiFetch(`/friends/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) fetchLinks();
+    } catch {
+      // ignore
+    }
   };
 
   if (loading) {
@@ -376,7 +381,7 @@ export default function AdminFriends() {
                 {/* 三种方式快捷说明 */}
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-adm-text-tertiary">
                   <span className="flex items-center gap-1">
-                    <Upload className="h-2.5 w-2.5" />点击头像或"上传"按钮
+                    <Upload className="h-2.5 w-2.5" />点击头像或&quot;上传&quot;按钮
                   </span>
                   <span className="flex items-center gap-1">
                     <Mail className="h-2.5 w-2.5" />填邮箱自动获取 Cravatar

@@ -37,7 +37,7 @@ export default async function MomentsPage() {
   ]);
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
       <ChannelHeader
@@ -45,11 +45,11 @@ export default async function MomentsPage() {
         subtitle="日记、故事小说、动漫心得、日常吐槽与生活光芒"
         icon="🍃"
         count={momentsData.total}
-        maxWidth="max-w-6xl xl:max-w-7xl"
+        maxWidth="max-w-[1400px] xl:max-w-[1560px] 2xl:max-w-[1680px]"
       />
 
-      <div className="relative mx-auto w-full max-w-6xl xl:max-w-7xl px-4 sm:px-6 pb-20">
-        <div className="flex justify-center items-start gap-5 xl:gap-6">
+      <div className="relative mx-auto w-full max-w-[1400px] xl:max-w-[1560px] 2xl:max-w-[1680px] px-4 sm:px-6 lg:px-8 pb-20">
+        <div className="flex justify-center items-start gap-6 xl:gap-8">
           {/* 桌面端左侧：个人信息与频道卡片 */}
           <MomentsLeftSidebar
             owner={owner}
@@ -58,7 +58,7 @@ export default async function MomentsPage() {
           />
 
           {/* 中间动态流主体 */}
-          <main className="relative flex-1 max-w-[600px] xl:max-w-[640px] min-w-0 w-full overflow-hidden rounded-3xl bg-wechat-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] border border-neutral-200/60 dark:border-neutral-800/80">
+          <main className="relative flex-1 max-w-[760px] xl:max-w-[880px] 2xl:max-w-[980px] min-w-0 w-full overflow-hidden rounded-3xl bg-wechat-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] border border-neutral-200/60 dark:border-neutral-800/80">
             <PostList
               initialPosts={momentsData.data}
               initialHasMore={momentsData.hasMore}
@@ -66,7 +66,6 @@ export default async function MomentsPage() {
               initialError={momentsData.error}
               type="moment"
             />
-            <Footer />
           </main>
 
           {/* 桌面宽屏端右侧：最新博文与站点信息卡片 */}
@@ -75,6 +74,7 @@ export default async function MomentsPage() {
             recentArticles={recentArticles}
           />
         </div>
+        <Footer />
       </div>
 
       <FloatingActions />

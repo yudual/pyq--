@@ -31,11 +31,12 @@ function preview(text: string) {
 }
 
 /** 从 post 提取预览类型和缩略图 */
-function getPostThumb(post: any, defaultCover = ""): { type: "music" | "image" | "link" | "text" | "video"; image: string; isLive: boolean } {
-  // 文章类型：优先使用文章封面，无封面时用博主背景图作为默认封面
+function getPostThumb(post: any, _fallback = ""): { type: "music" | "image" | "link" | "text" | "video"; image: string; isLive: boolean } {
+  // 文章类型：仅使用文章显式指定的封面，无封面时绝不填充默认图
   if (post.type === "article") {
-    const cover = post.cover || defaultCover || "";
-    return { type: "image", image: cover, isLive: false };
+    const cover = post.cover && typeof post.cover === "string" ? post.cover.trim() : "";
+    if (cover) return { type: "image", image: cover, isLive: false };
+    return { type: "text", image: "", isLive: false };
   }
   if (post.music) {
     const cover = (post.music as any)?.cover || (post.music as any)?.artwork || "";

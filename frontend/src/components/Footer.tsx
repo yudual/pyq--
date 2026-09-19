@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useSiteSettings } from "@/lib/site-settings-store";
 
-/** Mobile footer: editable copyright HTML + beian at bottom of main content */
+/** 全局底部：版权与备案信息一行展开平铺 */
 export default function Footer() {
   const beian = useSiteSettings((s) => s.beian);
   const beianUrl = useSiteSettings((s) => s.beianUrl);
@@ -20,20 +20,23 @@ export default function Footer() {
   const href = beianUrl || "https://beian.miit.gov.cn";
 
   return (
-    <footer className="px-4 pb-6 pt-2 md:hidden">
-      <div className="mx-auto max-w-[320px] rounded-2xl border border-black/[0.04] bg-[#f7f7f7]/90 px-3.5 py-2.5 text-center shadow-[0_4px_20px_-10px_rgba(0,0,0,0.08)] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-none">
+    <footer className="w-full py-6 text-center text-xs text-neutral-400 dark:text-neutral-500">
+      <div className="mx-auto flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 px-4 leading-relaxed">
         {footerHtml && (
-          <div
-            className="footer-html text-[11px] leading-relaxed text-wechat-time [&_a]:font-medium [&_a]:transition-colors hover:[&_a]:text-wechat-text-secondary"
+          <span
+            className="footer-html inline-flex flex-wrap items-center gap-x-1 [&_a]:text-neutral-500 hover:[&_a]:text-neutral-700 dark:[&_a]:text-neutral-400 dark:hover:[&_a]:text-neutral-200 transition-colors"
             dangerouslySetInnerHTML={{ __html: footerHtml }}
           />
+        )}
+        {footerHtml && beian && (
+          <span className="text-neutral-300 dark:text-neutral-600 select-none">·</span>
         )}
         {beian && (
           <a
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className={`${footerHtml ? "mt-0.5 " : ""}block text-[11px] text-wechat-time transition-colors hover:text-wechat-text-secondary`}
+            className="hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
           >
             {beian}
           </a>

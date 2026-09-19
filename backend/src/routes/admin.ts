@@ -1,22 +1,26 @@
 import { Router, Response } from "express";
 import bcrypt from "bcryptjs";
 import { body, param, validationResult } from "express-validator";
+import { Op } from "sequelize";
 import sequelize from "../config/database";
-import { User, Post, Comment, Like, SiteSetting } from "../models";
+import { User, Post, Comment, Like, CommentLike, SiteSetting } from "../models";
 import { authenticate, requireAdmin, AuthRequest } from "../middleware/auth";
 import { blacklistService } from "../services/blacklist-service";
 import { siteSettingTextDefaults } from "../models/SiteSetting";
 import { stripMarkdownAndFrontmatter } from "./posts";
+import { generateShortId } from "../utils/short-id";
+import { triggerRevalidate } from "../utils/revalidate";
 
 const router = Router();
 
 // GET /api/admin/dashboard - dashboard stats
 // 返回：users/posts(moments)/articles/comments/likes 总数 + 近7天 timeSeries + recentPosts + recentComments
 router.get("/dashboard", authenticate, requireAdmin, async (_req: AuthRequest, res: Response) => {
-  const [users, moments, articles, comments, likes] = await Promise.all([
+  const [users, moments, articles, draftArticles, comments, likes] = await Promise.all([
     User.count(),
     Post.count({ where: { type: "moment" } }),
     Post.count({ where: { type: "article" } }),
+    Post.count({ where: { type: "article", status: "draft" } }),
     Comment.count(),
     Like.count(),
   ]);
@@ -49,6 +53,26 @@ router.get("/dashboard", authenticate, requireAdmin, async (_req: AuthRequest, r
       likes: Number(r.likes) || 0,
     };
   });
+
+  // 最近 6 篇编辑或发表的文章（用于作者工作台直达编辑）
+  const recentArticleRows = await Post.findAll({
+    where: { type: "article" },
+    attributes: ["id", "shortId", "title", "excerpt", "category", "cover", "status", "pinned", "createdAt", "updatedAt"],
+    order: [["updatedAt", "DESC"]],
+    limit: 6,
+  });
+  const recentArticles = recentArticleRows.map((a: any) => ({
+    id: a.id,
+    shortId: a.shortId,
+    title: a.title || "无标题文章",
+    excerpt: a.excerpt ? stripMarkdownAndFrontmatter(a.excerpt).slice(0, 80) : "",
+    category: a.category || "随笔",
+    cover: a.cover || "",
+    status: a.status || "published",
+    pinned: !!a.pinned,
+    createdAt: a.createdAt,
+    updatedAt: a.updatedAt,
+  }));
 
   // 最近 5 条动态（含作者昵称、内容前 100 字、是否置顶）
   const recentPostRows = await Post.findAll({
@@ -85,7 +109,18 @@ router.get("/dashboard", authenticate, requireAdmin, async (_req: AuthRequest, r
     postContent: c.post ? (c.post.content || "").replace(/<[^>]+>/g, "").slice(0, 50) : "",
   }));
 
-  res.json({ users, posts: moments, articles, comments, likes, timeSeries, recentPosts, recentComments });
+  res.json({
+    users,
+    posts: moments,
+    articles,
+    draftArticles,
+    recentArticles,
+    comments,
+    likes,
+    timeSeries,
+    recentPosts,
+    recentComments,
+  });
 });
 
 // GET /api/admin/users - list users
@@ -106,8 +141,7 @@ function tryParseJson<T>(val: any, fallback: T): T {
   }
 }
 
-// GET /api/admin/posts - 管理端文章/动态列表（支持 type 过滤、分页）
-// type=article → 仅文章；type=moment → 仅动态；不传 → 全部
+// GET /api/admin/posts - list posts for admin (includes drafts, optional type/category/status/keyword filter)
 router.get("/posts", authenticate, requireAdmin, async (req: AuthRequest, res: Response) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
@@ -121,10 +155,24 @@ router.get("/posts", authenticate, requireAdmin, async (req: AuthRequest, res: R
   const categoryParam = req.query.category as string;
   if (categoryParam) {
     where.category = categoryParam;
+  } else if (typeParam === "article") {
+    // 后台文章页不应混入项目分类，否则前端分页后再过滤会造成总数和页码失真。
+    where.category = { [Op.ne]: "项目" };
   }
   const statusParam = req.query.status as string;
   if (statusParam && (statusParam === "published" || statusParam === "draft")) {
     where.status = statusParam;
+  }
+
+  // 关键词检索（跨标题、摘要、分类搜索）
+  const keyword = ((req.query.keyword || req.query.search) as string || "").trim();
+  if (keyword) {
+    const kw = `%${keyword}%`;
+    where[Op.or] = [
+      { title: { [Op.like]: kw } },
+      { excerpt: { [Op.like]: kw } },
+      { category: { [Op.like]: kw } },
+    ];
   }
 
   const { count, rows: posts } = await Post.findAndCountAll({
@@ -135,6 +183,15 @@ router.get("/posts", authenticate, requireAdmin, async (req: AuthRequest, res: R
     offset,
     distinct: true,
   });
+
+  // 查出所有关联的合辑标题
+  const colTitlesMap = new Map<string, string>();
+  const postsWithCol = posts.filter((p: any) => p.collectionId);
+  if (postsWithCol.length > 0) {
+    const colIds = Array.from(new Set(postsWithCol.map((p: any) => p.collectionId)));
+    const cols = await Post.findAll({ where: { id: { [Op.in]: colIds } }, attributes: ["id", "title"] });
+    for (const c of cols) colTitlesMap.set(c.id, c.title);
+  }
 
   res.json({
     data: posts.map((p: any) => ({
@@ -158,12 +215,312 @@ router.get("/posts", authenticate, requireAdmin, async (req: AuthRequest, res: R
       commentsDisabled: !!p.commentsDisabled,
       pinned: !!p.pinned,
       status: p.status || "published",
+      collectionId: p.collectionId || null,
+      collectionTitle: p.collectionId ? (colTitlesMap.get(p.collectionId) || "已加入合辑") : null,
+      hideInHome: !!p.hideInHome,
+      collectionPostIds: tryParseJson(p.collectionPostIds, null),
       createdAt: p.createdAt,
       author: p.author?.nickname || "",
     })),
     pagination: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
   });
 });
+
+// GET /api/admin/collections - 获取所有合辑列表
+router.get("/collections", authenticate, requireAdmin, async (_req: AuthRequest, res: Response) => {
+  try {
+    const collections = await Post.findAll({
+      where: { type: "collection" },
+      order: [["pinned", "DESC"], ["createdAt", "DESC"]],
+      include: [{ model: User, as: "author", attributes: ["id", "nickname", "avatar"] }],
+    });
+
+    const allChildIds = Array.from(
+      new Set(
+        collections.flatMap((c: any) => {
+          const ids = tryParseJson<string[]>(c.collectionPostIds, []);
+          return Array.isArray(ids) ? ids : [];
+        })
+      )
+    );
+
+    const childArticles = allChildIds.length > 0
+      ? await Post.findAll({
+          where: { id: { [Op.in]: allChildIds } },
+          attributes: ["id", "shortId", "title", "excerpt", "cover", "category", "status", "viewCount", "createdAt"],
+        })
+      : [];
+    const childMap = new Map(childArticles.map((a: any) => [a.id, a]));
+
+    const result = collections.map((c: any) => {
+      const ids = tryParseJson<string[]>(c.collectionPostIds, []);
+      const articles = (Array.isArray(ids) ? ids : []).map((id: string) => childMap.get(id)).filter(Boolean);
+      return {
+        id: c.id,
+        shortId: c.shortId,
+        title: c.title,
+        excerpt: c.excerpt,
+        cover: c.cover,
+        pinned: !!c.pinned,
+        status: c.status,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        postIds: Array.isArray(ids) ? ids : [],
+        articleCount: articles.length,
+        articles,
+      };
+    });
+
+    res.json({ data: result });
+  } catch (err: any) {
+    console.error("获取合辑列表失败:", err);
+    res.status(500).json({ message: err.message || "获取合辑列表失败" });
+  }
+});
+
+// POST /api/admin/collections - 创建合辑
+router.post(
+  "/collections",
+  authenticate,
+  requireAdmin,
+  [
+    body("title").trim().notEmpty().withMessage("合辑名称不能为空").isLength({ max: 200 }),
+    body("excerpt").optional().trim().isLength({ max: 500 }),
+    body("cover").optional().trim().isLength({ max: 512 }),
+    body("pinned").optional().isBoolean(),
+    body("postIds").isArray({ min: 1 }).withMessage("请至少选择一篇文章加入合辑"),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({ errors: errors.array(), message: errors.array()[0]?.msg || "参数验证失败" });
+      return;
+    }
+
+    try {
+      const { title, excerpt = "", cover = "", pinned = false, postIds } = req.body;
+      const userId = req.user!.id;
+      const normalizedPostIds: string[] = Array.from(
+        new Set<string>(postIds.map((id: unknown): string => String(id)))
+      );
+
+      // 合辑会直接展示在首页，只允许未归入其他合辑的已发布文章加入。
+      const posts = await Post.findAll({
+        where: {
+          id: { [Op.in]: normalizedPostIds },
+          type: "article",
+          status: "published",
+          category: { [Op.ne]: "项目" },
+          collectionId: null,
+        },
+        attributes: ["id", "title", "cover", "excerpt"],
+      });
+      if (posts.length !== normalizedPostIds.length) {
+        res.status(400).json({ message: "只能选择未加入其他合辑的已发布文章" });
+        return;
+      }
+
+      // 封面默认取传参或第一篇选中有封面的文章
+      let finalCover = cover;
+      if (!finalCover) {
+        const firstWithCover = posts.find((p: any) => p.cover && p.cover.trim());
+        finalCover = firstWithCover?.cover || "";
+      }
+
+      // 简介默认取传参或首篇文章摘要
+      let finalExcerpt = excerpt;
+      if (!finalExcerpt) {
+        finalExcerpt = posts[0]?.excerpt || `包含《${posts[0]?.title}》等 ${posts.length} 篇精选系列文章`;
+      }
+
+      // 创建合辑类型的 Post 记录
+      const shortId = await generateShortId();
+      const collection = await Post.create({
+        userId,
+        shortId,
+        type: "collection",
+        title: title.trim(),
+        excerpt: finalExcerpt.trim(),
+        cover: finalCover,
+        category: "合辑",
+        content: "",
+        images: [],
+        location: null,
+        music: null,
+        linkCard: null,
+        video: null,
+        douban: null,
+        pinned: !!pinned,
+        likesDisabled: false,
+        commentsDisabled: false,
+        ip: "",
+        region: "",
+        articleType: "original",
+        repostUrl: "",
+        status: "published",
+        hideInHome: false,
+        collectionId: null,
+        collectionPostIds: normalizedPostIds,
+      });
+
+      // 批量将选中的子文章标记为属于此合辑，且在首页普通流中隐藏
+      await Post.update(
+        { collectionId: collection.id, hideInHome: true },
+        { where: { id: { [Op.in]: normalizedPostIds } } }
+      );
+
+      triggerRevalidate(["/", "/articles"]).catch(() => {});
+
+      res.status(201).json({
+        message: "合辑创建成功",
+        data: {
+          id: collection.id,
+          shortId: collection.shortId,
+          title: collection.title,
+          excerpt: collection.excerpt,
+          cover: collection.cover,
+          postIds: normalizedPostIds,
+        },
+      });
+    } catch (err: any) {
+      console.error("创建合辑失败:", err);
+      res.status(500).json({ message: err.message || "创建合辑失败" });
+    }
+  }
+);
+
+// PUT /api/admin/collections/:id - 更新合辑（修改标题、摘要、封面、增删子文章等）
+router.put(
+  "/collections/:id",
+  authenticate,
+  requireAdmin,
+  [
+    param("id").isUUID(),
+    body("title").optional().trim().notEmpty().isLength({ max: 200 }),
+    body("excerpt").optional().trim().isLength({ max: 500 }),
+    body("cover").optional().trim().isLength({ max: 512 }),
+    body("pinned").optional().isBoolean(),
+    body("postIds").optional().isArray(),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({ errors: errors.array(), message: errors.array()[0]?.msg || "参数验证失败" });
+      return;
+    }
+
+    try {
+      const collection = await Post.findOne({ where: { id: req.params.id, type: "collection" } });
+      if (!collection) {
+        res.status(404).json({ message: "合辑不存在" });
+        return;
+      }
+
+      const { title, excerpt, cover, pinned, postIds } = req.body;
+      const updates: any = {};
+      if (title !== undefined) updates.title = title.trim();
+      if (excerpt !== undefined) updates.excerpt = excerpt.trim();
+      if (cover !== undefined) updates.cover = cover.trim();
+      if (pinned !== undefined) updates.pinned = !!pinned;
+
+      if (Array.isArray(postIds)) {
+        updates.collectionPostIds = postIds;
+        const oldIds: string[] = tryParseJson<string[]>(collection.collectionPostIds, []);
+        const removedIds = oldIds.filter((id) => !postIds.includes(id));
+        const newIds = postIds.filter((id) => !oldIds.includes(id));
+
+        if (removedIds.length > 0) {
+          await Post.update(
+            { collectionId: null, hideInHome: false },
+            { where: { id: { [Op.in]: removedIds }, collectionId: collection.id } }
+          );
+        }
+        if (newIds.length > 0) {
+          await Post.update(
+            { collectionId: collection.id, hideInHome: true },
+            { where: { id: { [Op.in]: newIds } } }
+          );
+        }
+      }
+
+      await collection.update(updates);
+
+      triggerRevalidate(["/", "/articles"]).catch(() => {});
+
+      res.json({ message: "合辑更新成功", data: collection });
+    } catch (err: any) {
+      console.error("更新合辑失败:", err);
+      res.status(500).json({ message: err.message || "更新合辑失败" });
+    }
+  }
+);
+
+// DELETE /api/admin/collections/:id - 解散合辑
+router.delete(
+  "/collections/:id",
+  authenticate,
+  requireAdmin,
+  [param("id").isUUID()],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const collection = await Post.findOne({ where: { id: req.params.id, type: "collection" } });
+      if (!collection) {
+        res.status(404).json({ message: "合辑不存在" });
+        return;
+      }
+
+      // 将归属于该合辑的所有文章全部恢复独立显示
+      await Post.update(
+        { collectionId: null, hideInHome: false },
+        { where: { collectionId: collection.id } }
+      );
+
+      // 删除合辑记录
+      await collection.destroy();
+
+      triggerRevalidate(["/", "/articles"]).catch(() => {});
+
+      res.json({ message: "合辑已成功解散，所有文章已恢复在首页独立展示" });
+    } catch (err: any) {
+      console.error("解散合辑失败:", err);
+      res.status(500).json({ message: err.message || "解散合辑失败" });
+    }
+  }
+);
+
+// POST /api/admin/collections/:id/remove-post - 将某单篇文章移出合辑
+router.post(
+  "/collections/:id/remove-post",
+  authenticate,
+  requireAdmin,
+  [param("id").isUUID(), body("postId").isUUID().withMessage("文章 ID 格式无效")],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const collection = await Post.findOne({ where: { id: req.params.id, type: "collection" } });
+      if (!collection) {
+        res.status(404).json({ message: "合辑不存在" });
+        return;
+      }
+
+      const { postId } = req.body;
+      const oldIds: string[] = tryParseJson<string[]>(collection.collectionPostIds, []);
+      const newIds = oldIds.filter((id) => id !== postId);
+      await collection.update({ collectionPostIds: newIds });
+
+      await Post.update(
+        { collectionId: null, hideInHome: false },
+        { where: { id: postId, collectionId: collection.id } }
+      );
+
+      triggerRevalidate(["/", "/articles"]).catch(() => {});
+
+      res.json({ message: "文章已成功移出合辑，将在首页恢复独立展示" });
+    } catch (err: any) {
+      console.error("移出合辑失败:", err);
+      res.status(500).json({ message: err.message || "移出合辑失败" });
+    }
+  }
+);
 
 // PUT /api/admin/users/:id - update user (admin only)
 router.put(
@@ -370,14 +727,26 @@ router.delete(
       return;
     }
 
-    const comment = await Comment.findByPk(req.params.id as string);
-    if (!comment) {
-      res.status(404).json({ message: "评论不存在" });
-      return;
-    }
+    try {
+      const comment = await Comment.findByPk(req.params.id as string);
+      if (!comment) {
+        res.status(404).json({ message: "评论不存在" });
+        return;
+      }
 
-    await comment.destroy();
-    res.status(204).send();
+      const commentId = comment.id;
+      // 1. 级联清理该评论的点赞
+      await CommentLike.destroy({ where: { commentId } }).catch(() => {});
+      // 2. 解除针对该评论的子回复外键引用
+      await Comment.update({ replyToId: null as any }, { where: { replyToId: commentId } }).catch(() => {});
+      // 3. 彻底删除评论
+      await comment.destroy();
+
+      res.status(204).send();
+    } catch (err: any) {
+      console.error("[delete comment error]:", err);
+      res.status(500).json({ message: err.message || "删除评论失败" });
+    }
   }
 );
 

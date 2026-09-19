@@ -18,6 +18,8 @@ import {
   Award,
   List,
   ChevronDown,
+  Layers,
+  ArrowRight,
 } from "lucide-react";
 import { Post, formatArticleTime } from "@/lib/mock-data";
 import { resolveAvatar } from "@/lib/avatar";
@@ -25,7 +27,6 @@ import { getCurrentUser, authFetchHeaders } from "@/lib/auth";
 import { useSiteSettings } from "@/lib/site-settings-store";
 import { toAbsoluteUrl } from "@/lib/upload";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
-import { extractHeadings } from "@/lib/markdown";
 import ArticleCommentSection from "@/components/article/ArticleCommentSection";
 import ArticleEmbedContent from "@/components/article/ArticleEmbedContent";
 import MusicEmbedCard from "@/components/article/MusicEmbedCard";
@@ -232,28 +233,7 @@ export default function ArticleReader({ post }: ArticleReaderProps) {
       ? window.location.href
       : `/articles/${post.shortId || post.id}`;
 
-  // 提取正文标题供折叠大纲导航使用（全量支持 Markdown 与 HTML）
-  const extractedHeadings = useMemo(() => {
-    return extractHeadings(post.content || "");
-  }, [post.content]);
 
-  const handleHeadingClick = (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    const el = document.getElementById(id);
-    if (!el) return;
-    const scrollRoot = document.getElementById("scroll-root");
-    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
-    if (scrollRoot && isDesktop && scrollRoot.scrollHeight > scrollRoot.clientHeight) {
-      const scrollRect = scrollRoot.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      const top = scrollRoot.scrollTop + (elRect.top - scrollRect.top) - 84;
-      scrollRoot.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    } else {
-      const elRect = el.getBoundingClientRect();
-      const top = window.scrollY + elRect.top - 84;
-      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    }
-  };
 
   return (
     <article className="w-full">
@@ -371,32 +351,6 @@ export default function ArticleReader({ post }: ArticleReaderProps) {
           </div>
         )}
 
-        {/* 响应式折叠式大纲导航（移动端、平板与普通屏幕） */}
-        {extractedHeadings.length > 0 && (
-          <details className="mt-6 group rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-neutral-50/60 dark:bg-neutral-900/40 p-4 transition-all">
-            <summary className="flex cursor-pointer items-center justify-between text-xs font-semibold text-neutral-700 dark:text-neutral-300 select-none">
-              <span className="flex items-center gap-2">
-                <List className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <span>文章大纲 · 章节导航 ({extractedHeadings.length})</span>
-              </span>
-              <ChevronDown className="h-4 w-4 text-neutral-400 transition-transform duration-200 group-open:rotate-180" />
-            </summary>
-            <nav className="mt-3 border-t border-neutral-200/60 dark:border-neutral-800/60 pt-3 space-y-1">
-              {extractedHeadings.map((h) => (
-                <a
-                  key={h.id}
-                  href={`#${h.id}`}
-                  onClick={(e) => handleHeadingClick(e, h.id)}
-                  className={`block rounded-lg px-2.5 py-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors ${
-                    h.level === 3 ? "ml-4" : "font-medium"
-                  }`}
-                >
-                  {h.text}
-                </a>
-              ))}
-            </nav>
-          </details>
-        )}
       </header>
 
       {/* 正文内容（含内联音乐/视频/富文本） */}
@@ -420,6 +374,91 @@ export default function ArticleReader({ post }: ArticleReaderProps) {
           </div>
         )}
       </section>
+
+      {/* 系列合辑章节导航（若属于某个系列合辑） */}
+      {post.collectionContext && (
+        <div className="my-8 rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-blue-50/20 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-neutral-900/40 p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3 pb-3 border-b border-blue-100/80 dark:border-blue-900/30">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-900 dark:text-blue-200">
+              <Layers className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span>所属系列：《{post.collectionContext.collectionTitle}》</span>
+            </div>
+            <span className="text-xs text-blue-600/80 dark:text-blue-400/80 font-medium">
+              第 {(post.collectionContext.currentIndex ?? 0) + 1} / {post.collectionContext.total} 篇
+            </span>
+          </div>
+
+          {/* 上一篇 / 下一篇 快捷跳转 */}
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {post.collectionContext.prevPost ? (
+              <Link
+                href={`/articles/${post.collectionContext.prevPost.shortId || post.collectionContext.prevPost.id}`}
+                className="group flex flex-col justify-center rounded-xl border border-white/80 dark:border-white/5 bg-white/80 dark:bg-neutral-800/60 p-3 transition-all hover:bg-white dark:hover:bg-neutral-800 hover:shadow-xs"
+              >
+                <span className="text-[11px] text-neutral-400 dark:text-neutral-500 inline-flex items-center gap-1">
+                  <ArrowLeft className="h-3 w-3" /> 上一篇
+                </span>
+                <span className="mt-0.5 truncate text-xs sm:text-sm font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  {post.collectionContext.prevPost.title}
+                </span>
+              </Link>
+            ) : (
+              <div className="flex flex-col justify-center rounded-xl border border-dashed border-neutral-200/60 dark:border-neutral-800/60 p-3 text-[11px] text-neutral-400 dark:text-neutral-600">
+                <span>已经是第一篇</span>
+              </div>
+            )}
+
+            {post.collectionContext.nextPost ? (
+              <Link
+                href={`/articles/${post.collectionContext.nextPost.shortId || post.collectionContext.nextPost.id}`}
+                className="group flex flex-col justify-center sm:text-right rounded-xl border border-white/80 dark:border-white/5 bg-white/80 dark:bg-neutral-800/60 p-3 transition-all hover:bg-white dark:hover:bg-neutral-800 hover:shadow-xs"
+              >
+                <span className="text-[11px] text-neutral-400 dark:text-neutral-500 inline-flex items-center sm:justify-end gap-1">
+                  下一篇 <ArrowRight className="h-3 w-3" />
+                </span>
+                <span className="mt-0.5 truncate text-xs sm:text-sm font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  {post.collectionContext.nextPost.title}
+                </span>
+              </Link>
+            ) : (
+              <div className="flex flex-col justify-center sm:text-right rounded-xl border border-dashed border-neutral-200/60 dark:border-neutral-800/60 p-3 text-[11px] text-neutral-400 dark:text-neutral-600">
+                <span>已经是最后一篇</span>
+              </div>
+            )}
+          </div>
+
+          {/* 系列所有章节快速查看 */}
+          {post.collectionContext.posts && post.collectionContext.posts.length > 0 && (
+            <details className="mt-3 group/toc">
+              <summary className="cursor-pointer text-xs font-medium text-blue-600 dark:text-blue-400 flex items-center justify-between py-1">
+                <span>查看该系列全部 {post.collectionContext.total} 篇章节</span>
+                <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-open/toc:rotate-180" />
+              </summary>
+              <div className="mt-2 space-y-1 pt-2 border-t border-blue-100/60 dark:border-blue-900/30">
+                {post.collectionContext.posts.map((sibling) => {
+                  const isCurr = sibling.isCurrent;
+                  return (
+                    <Link
+                      key={sibling.id}
+                      href={`/articles/${sibling.shortId || sibling.id}`}
+                      className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                        isCurr
+                          ? "bg-blue-600 text-white font-semibold"
+                          : "text-neutral-700 hover:bg-white/80 dark:text-neutral-300 dark:hover:bg-neutral-800/80"
+                      }`}
+                    >
+                      <span className="truncate">
+                        {sibling.order}. {sibling.title}
+                      </span>
+                      {isCurr && <span className="text-[10px] uppercase opacity-90">当前阅读</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
 
       {/* 正文后普通操作区（非微信公众号式的 fixed 底部栏） */}
       <section className="mt-12 sm:mt-16 pt-8 border-t border-black/[0.06] dark:border-white/[0.08]">

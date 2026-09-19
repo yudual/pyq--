@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MomentCard from "@/components/MomentCard";
 import ArticleFeedCard from "@/components/ArticleFeedCard";
+import ArticleCollectionFeedCard from "@/components/ArticleCollectionFeedCard";
 import ProjectCard from "@/components/ProjectCard";
 import { PostCardSkeleton, ArticleCardSkeleton } from "@/components/Skeleton";
 import { useSiteSettings } from "@/lib/site-settings-store";
@@ -17,6 +18,9 @@ import type { Post } from "@/lib/mock-data";
 export function FeedDispatcher({ post, index }: { post: Post; index: number }) {
   if (post.category === "项目" || post.type === "project") {
     return <ProjectCard post={post} index={index} variant="feed" />;
+  }
+  if (post.type === "collection") {
+    return <ArticleCollectionFeedCard post={post} index={index} />;
   }
   if (post.type === "article") {
     return <ArticleFeedCard post={post} index={index} variant="feed" />;

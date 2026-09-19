@@ -114,7 +114,6 @@ export default function AdminNotifications({ variant = "mobile" }: AdminNotifica
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
-  const defaultCover = useSiteSettings((s) => s.defaultCover);
   // useExitAnimation 必须在所有条件返回之前调用，否则违反 Rules of Hooks
   const notifExit = useExitAnimation(() => setOpen(false), 220);
 
@@ -341,7 +340,7 @@ export default function AdminNotifications({ variant = "mobile" }: AdminNotifica
                   </div>
                   {/* 动态缩略图 */}
                   {(() => {
-                    const coverImg = n.postImage || (n.isArticle ? defaultCover : "");
+                    const coverImg = n.postImage || "";
                     if ((n.postType === "music" || n.postType === "image" || n.postType === "link" || n.postType === "video") && coverImg) {
                       return (
                         <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded bg-wechat-bubble">
@@ -501,7 +500,7 @@ export default function AdminNotifications({ variant = "mobile" }: AdminNotifica
                           {/* 动态预览：音乐显示封面，图片显示缩略图，链接显示卡片图，视频显示封面+播放图标，文章显示封面，文字显示首字 */}
                           <div className="flex max-w-[90px] shrink-0 items-center justify-end">
                             {(() => {
-                              const coverImg = n.postImage || (n.isArticle ? defaultCover : "");
+                              const coverImg = n.postImage || "";
                               if (n.postType === "music" && coverImg) {
                                 return (
                                   <div className="relative h-10 w-10 overflow-hidden rounded-md bg-wechat-bubble">

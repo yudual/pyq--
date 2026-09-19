@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -8,84 +9,88 @@ import {
   Loader2,
   X,
   Image as ImageIcon,
-  MapPin,
   Heart,
   MessageSquare,
   Pin,
-  Link2,
   FolderOpen,
   SlidersHorizontal,
   CheckCircle2,
+  AlertCircle,
   Save,
   Upload,
-  Sparkles,
-  Eye,
   Calendar,
-  Clock,
   Trash2,
+  Clock,
+  FileText,
+  Check,
+  ExternalLink,
+  ChevronRight,
+  Eye,
+  RotateCcw,
 } from "lucide-react";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MediaPicker from "@/components/MediaPicker";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import AdminModal from "@/components/admin/AdminModal";
 import { apiFetch, getToken } from "@/lib/api-fetch";
 import { uploadImage, toAbsoluteUrl } from "@/lib/upload";
-import { wgs84ToGcj02 } from "@/lib/coord-transform";
 import { htmlToMarkdown } from "@/lib/markdown";
-import { syncFrontmatterToMarkdown, type ArticleFrontmatter } from "@/lib/frontmatter";
+import { syncFrontmatterToMarkdown, parseFrontmatter, type ArticleFrontmatter } from "@/lib/frontmatter";
 import { extractFirstMarkdownImage } from "@/lib/post-image";
 import { buildMusicEmbedHtml, buildLinkCardHtml, buildVideoEmbedHtml } from "@/components/editor/embed-utils";
 import { notifyContentUpdated } from "@/lib/content-sync";
 import { formatExactDateTime, toDateTimeLocal, toIsoDateString, type PostMusic, type PostVideo, type LinkCard } from "@/lib/mock-data";
 
-
 interface ArticleEditorPageProps {
   articleId?: string;
 }
 
-const DEFAULT_ARTICLE_TEMPLATE = `---
-title: "在碎片化时代重构个人的数字花园"
-category: "随笔"
-tags: ["思考", "写作", "博客"]
-articleType: "original"
----
-
-# 在碎片化时代重构个人的数字花园
-
-在这个信息飞速流转的时代，记录与表达是我们与数字浪潮对抗的最好方式。
-
-> [!TIP]
-> 这里的 Markdown 支持实时预览、截屏粘贴插图、语法高亮与 callout 提示框！
-
-## 一、为什么需要重构写作体验？
-传统的后台富文本编辑器往往充满了格式冗余与排版紊乱，而现代纯粹的 Markdown 写作能够带来极致的专注度：
-
-- ✨ **极简语法**：无需在复杂的操作按钮间反复查找
-- 🚀 **代码高亮**：原生支持数十种编程语言高亮
-- 📱 **多端自适应**：手机与电脑排版同样优雅
-
-\`\`\`ts
-interface GardenPost {
+interface ArticleSnapshot {
   title: string;
-  tags: string[];
-  publishedAt: Date;
+  content: string;
+  caption: string;
+  category: string;
+  cover: string;
+  articleType: "original" | "repost" | "ai";
+  repostUrl: string;
+  publishTime: string;
+  pinned: boolean;
+  likesDisabled: boolean;
+  commentsDisabled: boolean;
+  region: string;
 }
-\`\`\`
 
-## 二、思考与沉淀
-开始写下你的第一段文字吧...
-`;
+interface DraftArticleItem {
+  id: string | number;
+  title: string;
+  category?: string;
+  excerpt?: string;
+  content?: string;
+  createdAt: string;
+  [key: string]: unknown;
+}
+
+interface LocalDraftBackup {
+  title: string;
+  content: string;
+  caption: string;
+  category: string;
+  cover: string;
+  articleType: "original" | "repost" | "ai";
+  repostUrl: string;
+  savedAt: number;
+}
+
+const CATEGORY_PRESETS = ["随笔", "技术", "生活", "思考", "折腾"];
 
 export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps) {
   const router = useRouter();
-  const [activeArticleId, setActiveArticleId] = useState<string | null>(articleId || null);
-  const isEdit = !!activeArticleId;
+  const [activeArticleId, setActiveArticleId] = useState<string | null>(articleId ?? null);
+  const isEdit = Boolean(activeArticleId);
 
-  useEffect(() => {
-    if (articleId) setActiveArticleId(articleId);
-  }, [articleId]);
-
+  // 基础内容状态
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState(isEdit ? "" : DEFAULT_ARTICLE_TEMPLATE);
-  /** 朋友圈配文：展示在文章卡片上方的动态文字 */
+  const [content, setContent] = useState("");
   const [caption, setCaption] = useState("");
   const [cover, setCover] = useState("");
   const [category, setCategory] = useState("随笔");
@@ -93,33 +98,131 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
   const [repostUrl, setRepostUrl] = useState("");
   const [currentStatus, setCurrentStatus] = useState<"published" | "draft">("published");
   const [publishTime, setPublishTime] = useState<string>(() => toDateTimeLocal());
-  const [showDraftBox, setShowDraftBox] = useState(false);
-  const [draftArticles, setDraftArticles] = useState<any[]>([]);
-  const [loadingDrafts, setLoadingDrafts] = useState(false);
-  const [saveFeedback, setSaveFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [loading, setLoading] = useState(isEdit);
-  const [saving, setSaving] = useState<null | "published" | "draft">(null);
-  const [uploadingCover, setUploadingCover] = useState(false);
   const [region, setRegion] = useState("");
-  const [locating, setLocating] = useState(false);
   const [likesDisabled, setLikesDisabled] = useState(false);
   const [commentsDisabled, setCommentsDisabled] = useState(false);
   const [pinned, setPinned] = useState(false);
-  const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
-  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
-  const [showCoverInput, setShowCoverInput] = useState(false);
 
+  // 记录已保存快照，用于与当前编辑内容做 diff 避免直接在 render 中访问 ref
+  const [savedSnapshot, setSavedSnapshot] = useState<ArticleSnapshot | null>(null);
+
+  // 交互与抽屉状态
+  const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
+  const [showDraftBox, setShowDraftBox] = useState(false);
+  const [draftArticles, setDraftArticles] = useState<DraftArticleItem[]>([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
+  const [loading, setLoading] = useState(Boolean(articleId));
+  const [saving, setSaving] = useState<null | "published" | "draft">(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  // 本地自动草稿与防丢提示
+  const [localBackup, setLocalBackup] = useState<LocalDraftBackup | null>(null);
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+
+  // 弹窗状态
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [draftToDelete, setDraftToDelete] = useState<{ id: number | string; title: string } | null>(null);
+  const [publishedSuccessInfo, setPublishedSuccessInfo] = useState<{ id: string; title: string } | null>(null);
+
+  // 状态反馈 Toast
+  const [saveFeedback, setSaveFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markdownFileInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
-  const initialSnapshotRef = useRef<{ title: string; content: string; caption: string } | null>(null);
+  const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
   const savedDraftRef = useRef(false);
 
+  const showFeedback = useCallback((type: "success" | "error", message: string) => {
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    setSaveFeedback({ type, message });
+    feedbackTimerRef.current = setTimeout(() => {
+      setSaveFeedback((curr) => (curr?.message === message ? null : curr));
+      feedbackTimerRef.current = null;
+    }, 4000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    };
+  }, []);
+
+  // 自适应标题文本框高度
+  const adjustTitleHeight = useCallback(() => {
+    if (titleTextareaRef.current) {
+      titleTextareaRef.current.style.height = "auto";
+      titleTextareaRef.current.style.height = `${Math.max(titleTextareaRef.current.scrollHeight, 44)}px`;
+    }
+  }, []);
+
+  useEffect(() => {
+    adjustTitleHeight();
+  }, [title, adjustTitleHeight]);
+
+  // 计算字数与预计阅读时间
+  const readingStats = useMemo(() => {
+    const textOnly = content.replace(/```[\s\S]*?```/g, "").replace(/#+\s+/g, "").trim();
+    const charCount = textOnly.length;
+    const words = (textOnly.match(/[\w\d]+/g) || []).length;
+    const totalCount = Math.max(charCount, words);
+    const estMinutes = Math.max(1, Math.ceil(totalCount / 350));
+    return { count: totalCount, minutes: estMinutes };
+  }, [content]);
+
+  // 判断是否有未保存的改动
+  const isDirty = useMemo(() => {
+    if (!savedSnapshot) {
+      return title.trim().length > 0 || content.trim().length > 0;
+    }
+    return (
+      savedSnapshot.title !== title.trim() ||
+      savedSnapshot.content !== content ||
+      savedSnapshot.caption !== caption.trim() ||
+      savedSnapshot.category !== category.trim() ||
+      savedSnapshot.cover !== cover.trim() ||
+      savedSnapshot.articleType !== articleType ||
+      savedSnapshot.repostUrl !== repostUrl.trim() ||
+      savedSnapshot.publishTime !== publishTime ||
+      savedSnapshot.pinned !== pinned ||
+      savedSnapshot.likesDisabled !== likesDisabled ||
+      savedSnapshot.commentsDisabled !== commentsDisabled ||
+      savedSnapshot.region !== region.trim()
+    );
+  }, [
+    savedSnapshot,
+    title,
+    content,
+    caption,
+    category,
+    cover,
+    articleType,
+    repostUrl,
+    publishTime,
+    pinned,
+    likesDisabled,
+    commentsDisabled,
+    region,
+  ]);
+
+  // 本地自动保存缓存 key
+  const autoSaveKey = useMemo(() => {
+    return `blog_article_auto_backup_${articleId || "new"}`;
+  }, [articleId]);
+
+  // 获取草稿箱数据
   const fetchDraftArticles = useCallback(async () => {
     setLoadingDrafts(true);
     try {
       const res = await apiFetch("/admin/posts?type=article&status=draft&limit=50");
       if (res.ok) {
         const data = await res.json();
-        const list = (data.data || []).filter((item: any) => item.category !== "项目" && item.type !== "project");
+        const list = (data.data || []).filter((item: DraftArticleItem) => item.category !== "项目" && (item as Record<string, unknown>).type !== "project");
         setDraftArticles(list);
       }
     } catch {
@@ -133,29 +236,137 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
     fetchDraftArticles();
   }, [fetchDraftArticles]);
 
-  // 加载已存在的文章
+  // 检查本地自动保存备份
   useEffect(() => {
-    if (!articleId) return;
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(autoSaveKey);
+      if (raw) {
+        const parsed: LocalDraftBackup = JSON.parse(raw);
+        if (Date.now() - parsed.savedAt < 24 * 3600 * 1000 && (parsed.content.trim() || parsed.title.trim())) {
+          setLocalBackup(parsed);
+          if (!articleId) {
+            setShowRestorePrompt(true);
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [autoSaveKey, articleId]);
+
+  // 定时将未提交改动自动备份到本地 LocalStorage（每 5 秒防抖）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const timer = setTimeout(() => {
+      if (title.trim() || content.trim()) {
+        const backup: LocalDraftBackup = {
+          title,
+          content,
+          caption,
+          category,
+          cover,
+          articleType,
+          repostUrl,
+          savedAt: Date.now(),
+        };
+        try {
+          localStorage.setItem(autoSaveKey, JSON.stringify(backup));
+        } catch {
+          // ignore
+        }
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [title, content, caption, category, cover, articleType, repostUrl, autoSaveKey]);
+
+  // 恢复本地备份
+  const handleRestoreBackup = useCallback(() => {
+    if (!localBackup) return;
+    setTitle(localBackup.title || "");
+    setContent(localBackup.content || "");
+    setCaption(localBackup.caption || "");
+    if (localBackup.category) setCategory(localBackup.category);
+    if (localBackup.cover) setCover(localBackup.cover);
+    if (localBackup.articleType) setArticleType(localBackup.articleType);
+    if (localBackup.repostUrl) setRepostUrl(localBackup.repostUrl);
+    setShowRestorePrompt(false);
+    showFeedback("success", "已成功恢复本地未保存草稿！");
+  }, [localBackup, showFeedback]);
+
+  const handleDiscardBackup = useCallback(() => {
+    try {
+      localStorage.removeItem(autoSaveKey);
+    } catch {
+      // ignore
+    }
+    setLocalBackup(null);
+    setShowRestorePrompt(false);
+  }, [autoSaveKey]);
+
+  // 加载已有文章数据
+  useEffect(() => {
+    if (!articleId) {
+      setActiveArticleId(null);
+      setTitle("");
+      setContent("");
+      setCaption("");
+      setCover("");
+      setCategory("随笔");
+      setArticleType("original");
+      setRepostUrl("");
+      setCurrentStatus("published");
+      const initTime = toDateTimeLocal();
+      setPublishTime(initTime);
+      setRegion("");
+      setLikesDisabled(false);
+      setCommentsDisabled(false);
+      setPinned(false);
+      setSavedSnapshot({
+        title: "",
+        content: "",
+        caption: "",
+        category: "随笔",
+        cover: "",
+        articleType: "original",
+        repostUrl: "",
+        publishTime: initTime,
+        pinned: false,
+        likesDisabled: false,
+        commentsDisabled: false,
+        region: "",
+      });
+      savedDraftRef.current = false;
+      setLoading(false);
+      return;
+    }
+
     (async () => {
+      setLoading(true);
       try {
         const res = await apiFetch(`/posts/${articleId}`);
-        if (!res.ok) throw new Error("加载失败");
+        if (!res.ok) throw new Error("加载文章数据失败");
         const data = await res.json();
         const rawCaption = data.excerpt || "";
         const isJunkCaption = /^---\s*(?:title|category|tags|articleType):/i.test(rawCaption);
         const cleanCaption = isJunkCaption ? "" : rawCaption;
 
-        setTitle(data.title || "");
+        const nextTitle = data.title ? data.title.trim() : "";
+        const nextCategory = data.category ? data.category.trim() : "随笔";
+        const nextCover = data.cover ? data.cover.trim() : "";
+        const nextArticleType = (data.articleType as "original" | "repost" | "ai") || "original";
+        const nextRepostUrl = data.repostUrl ? data.repostUrl.trim() : "";
+        const nextRegion = data.region ? data.region.trim() : "";
+        const nextTime = data.createdAt ? toDateTimeLocal(data.createdAt) : toDateTimeLocal();
+
+        setTitle(nextTitle);
         setCaption(cleanCaption);
-        setCategory(data.category || "随笔");
+        setCategory(nextCategory);
         setCurrentStatus(data.status || "published");
-        if (data.createdAt) {
-          setPublishTime(toDateTimeLocal(data.createdAt));
-        }
+        setPublishTime(nextTime);
 
         let mergedContent = data.content || "";
 
-        // 旧数据兼容：将独立的 music/linkCard/video 字段注入到 content 中作为内联嵌入块
         if (data.music && !/data-embed="music"/.test(mergedContent)) {
           mergedContent += buildMusicEmbedHtml(data.music as PostMusic);
         }
@@ -166,35 +377,59 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           mergedContent += buildVideoEmbedHtml(data.video as PostVideo);
         }
 
-        // 将可能存在的旧 HTML 转为高质量 Markdown
         const convertedMd = htmlToMarkdown(mergedContent);
         setContent(convertedMd);
 
-        setCover(data.cover || "");
-        setArticleType(data.articleType || "original");
-        setRepostUrl(data.repostUrl || "");
-        setRegion(data.region || "");
+        setCover(nextCover);
+        setArticleType(nextArticleType);
+        setRepostUrl(nextRepostUrl);
+        setRegion(nextRegion);
         setLikesDisabled(!!data.likesDisabled);
         setCommentsDisabled(!!data.commentsDisabled);
         setPinned(!!data.pinned);
 
-        initialSnapshotRef.current = {
-          title: data.title || "",
+        setSavedSnapshot({
+          title: nextTitle,
           content: convertedMd,
           caption: cleanCaption,
-        };
+          category: nextCategory,
+          cover: nextCover,
+          articleType: nextArticleType,
+          repostUrl: nextRepostUrl,
+          publishTime: nextTime,
+          pinned: !!data.pinned,
+          likesDisabled: !!data.likesDisabled,
+          commentsDisabled: !!data.commentsDisabled,
+          region: nextRegion,
+        });
+
+        // 检查本地备份
+        const rawLocal = localStorage.getItem(`blog_article_auto_backup_${articleId}`);
+        if (rawLocal) {
+          const parsedLocal: LocalDraftBackup = JSON.parse(rawLocal);
+          if (
+            parsedLocal.content &&
+            parsedLocal.content !== convertedMd &&
+            parsedLocal.savedAt > new Date(data.updatedAt || data.createdAt).getTime()
+          ) {
+            setLocalBackup(parsedLocal);
+            setShowRestorePrompt(true);
+          }
+        }
       } catch (err) {
-        alert(err instanceof Error ? err.message : "加载文章失败");
-        router.push("/admin/articles");
+        showFeedback("error", err instanceof Error ? err.message : "加载文章失败");
+        setTimeout(() => {
+          router.push("/admin/articles");
+        }, 1500);
       } finally {
         setLoading(false);
       }
     })();
-  }, [articleId, router]);
+  }, [articleId, router, showFeedback]);
 
   const lastFmRef = useRef<ArticleFrontmatter>({});
 
-  // 当 Frontmatter 解析出属性时同步到 UI 状态
+  // 当编辑器解析出 Frontmatter 时同步到各状态
   const handleFrontmatterChange = useCallback((fm: ArticleFrontmatter) => {
     const prev = lastFmRef.current;
     if (fm.title !== undefined && fm.title !== prev.title && typeof fm.title === "string") {
@@ -226,116 +461,56 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
     lastFmRef.current = fm;
   }, []);
 
-  const handleAutoLocate = useCallback(async () => {
-    setLocating(true);
-    try {
-      if (navigator.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 20000,
-              maximumAge: 0,
-            });
-          });
-          const { longitude, latitude } = pos.coords;
-          const [gcjLng, gcjLat] = wgs84ToGcj02(longitude, latitude);
-          const regeoRes = await apiFetch(`/location/regeo?lng=${gcjLng}&lat=${gcjLat}`);
-          if (regeoRes.ok) {
-            const regeoData = await regeoRes.json();
-            if (regeoData.province) {
-              setRegion(regeoData.province);
-              return;
-            }
-          }
-        } catch {
-          // GPS 降级到 IP
-        }
-      }
-
-      const res = await apiFetch("/location/ip");
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "定位失败");
-      }
-      const data = await res.json();
-      if (data.province) {
-        setRegion(data.province);
-      } else {
-        throw new Error("无法获取定位信息");
-      }
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "定位失败");
-    } finally {
-      setLocating(false);
-    }
-  }, []);
-
+  // 封面直传处理
   const handleCoverUpload = useCallback(async (file: File) => {
     const token = getToken();
     if (!token) {
-      alert("请先登录");
+      showFeedback("error", "请先登录管理后台");
       return;
     }
     setUploadingCover(true);
     try {
       const url = await uploadImage(file, token);
       setCover(url);
+      showFeedback("success", "封面图片已上传");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "封面上传失败");
+      showFeedback("error", err instanceof Error ? err.message : "封面上传失败");
     } finally {
       setUploadingCover(false);
     }
-  }, []);
+  }, [showFeedback]);
 
-  const onCoverChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) handleCoverUpload(file);
-      e.target.value = "";
-    },
-    [handleCoverUpload]
-  );
+  // 从文章内容中提取首张图片作为封面
+  const handleExtractCoverFromContent = useCallback(() => {
+    const firstImg = extractFirstMarkdownImage(content);
+    if (!firstImg) {
+      showFeedback("error", "正文中未发现任何图片，请先在编辑器中插入图片");
+      return;
+    }
+    setCover(firstImg);
+    showFeedback("success", "已成功提取正文首图为文章封面");
+  }, [content, showFeedback]);
 
+  // 移除封面
+  const handleRemoveCover = useCallback(() => {
+    setCover("");
+    showFeedback("success", "已清除封面设置");
+  }, [showFeedback]);
+
+  // 保存 / 发布文章核心动作
   const handleSave = useCallback(
-    async (
-      targetStatus: "published" | "draft" = "published",
-      options: { stay?: boolean } = {}
-    ) => {
-      let finalTitle = title.trim();
-      // 如果标题框没填，尝试从 Markdown 的第一个 # 标题中提取
-      if (!finalTitle) {
-        const h1Match = content.match(/^#\s+(.+)$/m);
-        if (h1Match) finalTitle = h1Match[1].trim();
-      }
-
-      if (targetStatus === "published") {
-        if (!finalTitle) {
-          alert("请输入文章标题（或在正文第一行写 # 标题）");
-          return;
-        }
-        if (!content.trim()) {
-          alert("请输入文章正文内容");
-          return;
-        }
-        if (articleType === "repost" && !repostUrl.trim()) {
-          alert("转载文章请填写转载来源链接");
-          return;
-        }
+    async (targetStatus: "published" | "draft", options: { stay?: boolean } = {}) => {
+      const finalTitle = title.trim();
+      if (!finalTitle && targetStatus === "published") {
+        showFeedback("error", "文章标题不能为空，请输入标题后再发布");
+        return;
       }
 
       setSaving(targetStatus);
       try {
-        const token = getToken();
-        if (!token) {
-          alert("请先登录管理后台");
-          router.push("/admin");
-          return;
-        }
-
         const finalCover = cover.trim();
 
-        // 同步最新的标题与属性到正文开头的 Frontmatter（保持 Markdown 源码自洽一致）
+        // 统一同步 Frontmatter 到正文头部
         const synchronizedContent = syncFrontmatterToMarkdown(content, {
           title: finalTitle,
           category: category.trim() || "随笔",
@@ -350,7 +525,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
 
         const body: Record<string, unknown> = {
           type: "article" as const,
-          title: finalTitle,
+          title: finalTitle || "无标题草稿",
           content: synchronizedContent,
           excerpt: caption.trim(),
           cover: finalCover,
@@ -377,7 +552,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.message || "保存失败");
+            throw new Error(err.message || "保存文章失败");
           }
         } else {
           const res = await apiFetch(`/posts`, {
@@ -387,38 +562,62 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.message || "发布失败");
+            throw new Error(err.message || "发布文章失败");
           }
           const created = await res.json();
           targetId = created.id;
           setActiveArticleId(created.id);
         }
 
+        setContent(synchronizedContent);
         setCurrentStatus(targetStatus);
         savedDraftRef.current = true;
-        initialSnapshotRef.current = {
+        setSavedSnapshot({
           title: finalTitle,
           content: synchronizedContent,
           caption: caption.trim(),
-        };
+          category: category.trim() || "随笔",
+          cover: finalCover,
+          articleType,
+          repostUrl: articleType === "repost" ? repostUrl.trim() : "",
+          publishTime,
+          pinned,
+          likesDisabled,
+          commentsDisabled,
+          region: region.trim(),
+        });
+
+        // 清理本地自动备份
+        try {
+          localStorage.removeItem(autoSaveKey);
+        } catch {
+          // ignore
+        }
+
         notifyContentUpdated();
         fetchDraftArticles();
 
-        if (options.stay) {
-          setSaveFeedback({
-            type: "success",
-            message: targetStatus === "draft" ? "草稿已安全保存至草稿箱" : "文章已成功发布并同步至前台",
+        if (targetStatus === "published") {
+          setPublishedSuccessInfo({
+            id: targetId || "",
+            title: finalTitle || "文章",
           });
-          if (targetId) {
+          showFeedback("success", "文章已成功发布并同步至前台！");
+          if (targetId && !isEdit) {
             window.history.replaceState(null, "", `/admin/articles/${targetId}`);
           }
-          setTimeout(() => setSaveFeedback(null), 3500);
         } else {
-          router.push("/admin/articles");
-          router.refresh();
+          showFeedback("success", "草稿已安全保存");
+          if (targetId && !isEdit) {
+            window.history.replaceState(null, "", `/admin/articles/${targetId}`);
+          }
+        }
+
+        if (!options.stay && targetStatus === "published") {
+          // 预留
         }
       } catch (err) {
-        alert(err instanceof Error ? err.message : "操作失败");
+        showFeedback("error", err instanceof Error ? err.message : "保存操作失败");
       } finally {
         setSaving(null);
       }
@@ -438,53 +637,173 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
       publishTime,
       isEdit,
       activeArticleId,
-      router,
+      autoSaveKey,
       fetchDraftArticles,
+      showFeedback,
     ]
   );
 
-  const hasUnsavedContent = useCallback(() => {
-    if (!isEdit) {
-      return title.trim().length > 0 || (content.trim().length > 0 && content !== DEFAULT_ARTICLE_TEMPLATE);
-    }
-    const snap = initialSnapshotRef.current;
-    if (!snap) return false;
-    return snap.title !== title || snap.content !== content || snap.caption !== caption;
-  }, [title, content, caption, isEdit]);
-
+  // 返回按钮
   const handleBack = useCallback(() => {
-    if (savedDraftRef.current) {
+    if (savedDraftRef.current && !isDirty) {
       router.push("/admin/articles");
       return;
     }
-    if (hasUnsavedContent()) {
-      const ok = window.confirm(
-        "你有未保存的内容，是否保存为草稿？\n\n点击「确定」保存为草稿；\n点击「取消」放弃当前内容返回列表。"
-      );
-      if (ok) {
-        handleSave("draft");
-        return;
-      }
+    if (isDirty) {
+      setShowLeaveModal(true);
+      return;
     }
     router.push("/admin/articles");
-  }, [hasUnsavedContent, handleSave, router]);
+  }, [isDirty, router]);
 
+  // 全局快捷键
+  useEffect(() => {
+    const onGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+      // Ctrl+S / Cmd+S 快速存草稿
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSave("draft", { stay: true });
+        return;
+      }
+      // Ctrl+Enter / Cmd+Enter 快速发布
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        handleSave("published", { stay: true });
+        return;
+      }
+      // Esc 关闭属性抽屉
+      if (e.key === "Escape" && showSettingsDrawer) {
+        setShowSettingsDrawer(false);
+      }
+    };
+    window.addEventListener("keydown", onGlobalKeyDown);
+    return () => window.removeEventListener("keydown", onGlobalKeyDown);
+  }, [handleSave, showSettingsDrawer]);
+
+  // 页面离开未保存防丢提示
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (savedDraftRef.current) return;
-      if (hasUnsavedContent()) {
+      if (savedDraftRef.current && !isDirty) return;
+      if (isDirty) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [hasUnsavedContent]);
+  }, [isDirty]);
+
+  // 导入 Markdown 文件处理
+  const executeImportMarkdown = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text();
+        const { frontmatter: fm } = parseFrontmatter(text);
+
+        let nextTitle = "";
+        if (typeof fm.title === "string" && fm.title.trim()) {
+          nextTitle = fm.title.trim();
+        } else {
+          const h1Match = text.match(/^#\s+(.+)$/m);
+          if (h1Match) {
+            nextTitle = h1Match[1].trim();
+          } else {
+            nextTitle = file.name.replace(/\.(md|markdown|txt)$/i, "").trim();
+          }
+        }
+
+        setTitle(nextTitle);
+        setContent(text);
+
+        if (typeof fm.category === "string" && fm.category.trim()) {
+          setCategory(fm.category.trim());
+        }
+        if (typeof fm.cover === "string" && fm.cover.trim()) {
+          setCover(fm.cover.trim());
+        }
+        if (typeof fm.excerpt === "string" && fm.excerpt.trim()) {
+          setCaption(fm.excerpt.trim());
+        }
+        if (
+          fm.articleType &&
+          typeof fm.articleType === "string" &&
+          ["original", "repost", "ai"].includes(fm.articleType)
+        ) {
+          setArticleType(fm.articleType as "original" | "repost" | "ai");
+        }
+        if (typeof fm.repostUrl === "string" && fm.repostUrl.trim()) {
+          setRepostUrl(fm.repostUrl.trim());
+        }
+        if (typeof fm.pinned === "boolean") {
+          setPinned(fm.pinned);
+        }
+        if (typeof fm.date === "string" && fm.date.trim()) {
+          const parsedDate = new Date(fm.date);
+          if (!isNaN(parsedDate.getTime())) {
+            setPublishTime(toDateTimeLocal(parsedDate));
+          }
+        }
+
+        showFeedback("success", `已导入「${file.name}」并提取标题与元数据`);
+      } catch (err) {
+        showFeedback("error", err instanceof Error ? err.message : "读取 Markdown 文件失败");
+      }
+    },
+    [showFeedback]
+  );
+
+  const handleMarkdownFileSelected = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      e.target.value = "";
+      if (isDirty) {
+        setPendingImportFile(file);
+        setShowImportConfirm(true);
+      } else {
+        executeImportMarkdown(file);
+      }
+    },
+    [isDirty, executeImportMarkdown]
+  );
+
+  // 全局拖拽 Markdown 文件支持
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDraggingFile(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDraggingFile(false);
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+
+      if (file.name.match(/\.(md|markdown|txt)$/i)) {
+        if (isDirty) {
+          setPendingImportFile(file);
+          setShowImportConfirm(true);
+        } else {
+          executeImportMarkdown(file);
+        }
+      }
+    },
+    [isDirty, executeImportMarkdown]
+  );
 
   if (loading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-adm-text-tertiary" />
+      <div className="flex h-[70vh] flex-col items-center justify-center gap-3">
+        <Loader2 className="h-6 w-6 animate-spin text-adm-text-tertiary" />
+        <p className="text-xs text-adm-text-secondary">加载文章中...</p>
       </div>
     );
   }
@@ -492,56 +811,92 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
   const token = getToken() || "";
 
   return (
-    <div className="mx-auto max-w-[1440px] px-3 sm:px-6 py-4 flex flex-col space-y-3 pb-8">
-      {/* 顶部主操作栏：返回 + 状态标签 + 标题输入 + 设置展开 + 存草稿 + 发布 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-adm-border pb-3">
-        <div className="flex items-center gap-2.5 flex-1 min-w-[280px]">
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="relative min-h-[calc(100vh-4rem)] flex flex-col pb-6"
+    >
+      {/* 拖拽文件进入全屏提示蒙层 */}
+      {isDraggingFile && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-adm-bg/85 backdrop-blur-sm border-2 border-dashed border-emerald-500 m-4 rounded-3xl animate-fade-in pointer-events-none">
+          <Upload className="h-12 w-12 text-emerald-500 animate-bounce" />
+          <h3 className="mt-3 text-lg font-bold text-adm-text">松开鼠标，导入 Markdown 文档</h3>
+          <p className="mt-1 text-xs text-adm-text-secondary">系统将自动解析文章内容、标题与 Frontmatter 属性</p>
+        </div>
+      )}
+
+      {/* 顶部现代化操作控制栏（Linear / Ghost 质感） */}
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-adm-border bg-adm-bg/90 backdrop-blur-md py-2.5 px-4 sm:px-8 xl:px-10 mb-3">
+        {/* 左侧：返回 + 面包屑 + 保存状态指示 */}
+        <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
             onClick={handleBack}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-adm-border text-adm-text-secondary hover:bg-adm-input hover:text-adm-text transition-colors cursor-pointer shrink-0"
-            title="返回文章列表"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-adm-border text-adm-text-secondary hover:bg-adm-input hover:text-adm-text transition-colors cursor-pointer shrink-0"
+            title="返回文章管理"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
 
-          {/* 实时文章状态标识 */}
+          <div className="flex items-center gap-1.5 text-xs text-adm-text-secondary truncate">
+            <span className="hidden sm:inline hover:underline cursor-pointer" onClick={() => router.push("/admin/articles")}>
+              文章
+            </span>
+            <ChevronRight className="h-3 w-3 text-adm-text-tertiary hidden sm:inline" />
+            <span className="font-semibold text-adm-text truncate max-w-[140px] sm:max-w-[240px]">
+              {title.trim() || (isEdit ? "编辑文章" : "写新文章")}
+            </span>
+          </div>
+
           <span
-            className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold border select-none ${
+            className={`hidden md:inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium border select-none ${
               currentStatus === "draft"
-                ? "border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                : "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                ? "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                : "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
             }`}
           >
+            <span className={`h-1.5 w-1.5 rounded-full ${currentStatus === "draft" ? "bg-amber-500" : "bg-emerald-500"}`} />
             {currentStatus === "draft" ? "草稿箱" : "已发布"}
           </span>
 
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="文章标题..."
-            maxLength={200}
-            className="flex-1 rounded-xl border border-adm-border bg-adm-card px-4 py-2 text-base sm:text-lg font-bold text-adm-text placeholder:text-adm-text-tertiary focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-          />
+          {/* 实时改动状态小圆点 */}
+          <span className="hidden lg:inline-flex items-center text-[11px] text-adm-text-tertiary ml-1">
+            {isDirty ? (
+              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                未保存更改
+              </span>
+            ) : (
+              <span className="text-adm-text-tertiary">已同步</span>
+            )}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* 属性设置抽屉开关 */}
+        {/* 右侧：统计 + 导入 + 草稿箱 + 存草稿 + 文章设置抽屉 + 发布主按钮 */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* 阅读字数与时间统计 */}
+          <div className="hidden xl:flex items-center gap-2 text-xs text-adm-text-tertiary mr-1 select-none">
+            <span className="flex items-center gap-1">
+              <FileText className="h-3 w-3" />
+              {readingStats.count} 字
+            </span>
+            <span>·</span>
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              约 {readingStats.minutes} 分钟
+            </span>
+          </div>
+
+          {/* 导入 Markdown 文件 */}
           <button
             type="button"
-            onClick={() => setShowSettingsDrawer(!showSettingsDrawer)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-colors cursor-pointer ${
-              showSettingsDrawer
-                ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                : "border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-input"
-            }`}
+            onClick={() => markdownFileInputRef.current?.click()}
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-2.5 py-1.5 text-xs font-medium text-adm-text-secondary hover:bg-adm-input hover:text-adm-text transition-colors cursor-pointer"
+            title="选择本地 .md 文件导入（也可直接拖拽文件入编辑区）"
           >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span>{showSettingsDrawer ? "收起属性设置" : "文章属性设置"}</span>
-            {cover && (
-              <span className="ml-0.5 flex h-2 w-2 rounded-full bg-emerald-500" title="已设置专属封面" />
-            )}
+            <Upload className="h-3.5 w-3.5" />
+            <span>导入 .md</span>
           </button>
 
           {/* 草稿箱入口 */}
@@ -551,361 +906,461 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
               setShowDraftBox(true);
               fetchDraftArticles();
             }}
-            className="flex items-center gap-1.5 rounded-xl border border-adm-border bg-adm-card px-3 py-2 text-xs font-medium text-adm-text-secondary hover:bg-adm-input transition-colors cursor-pointer"
-            title="查看草稿箱中的未发布文章"
+            className="relative inline-flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-2.5 py-1.5 text-xs font-medium text-adm-text-secondary hover:bg-adm-input hover:text-adm-text transition-colors cursor-pointer"
+            title="查看草稿箱"
           >
             <FolderOpen className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-            <span>草稿箱</span>
+            <span className="hidden sm:inline">草稿箱</span>
             {draftArticles.length > 0 && (
-              <span className="rounded-full bg-amber-500 text-white px-1.5 py-0.2 text-[10px] font-bold">
+              <span className="rounded-full bg-amber-500/90 text-white px-1.5 py-0.2 text-[10px] font-bold">
                 {draftArticles.length}
               </span>
             )}
           </button>
 
-          {/* 存草稿（就地安全保存，不强制跳出编辑流程） */}
+          {/* 存草稿 (Ctrl+S) */}
           <button
             type="button"
             onClick={() => handleSave("draft", { stay: true })}
             disabled={saving !== null}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-adm-border bg-adm-card px-3.5 py-2 text-xs font-medium text-adm-text hover:bg-adm-input disabled:opacity-50 transition-colors cursor-pointer"
-            title="保存草稿 (Ctrl+S)"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-xs font-medium text-adm-text hover:bg-adm-input disabled:opacity-50 transition-colors cursor-pointer"
+            title="静默存为草稿 (Ctrl/Cmd+S)"
           >
             {saving === "draft" ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            <span>存草稿</span>
+            <span className="hidden sm:inline">存草稿</span>
           </button>
 
-          {/* 若已是发布状态，允许一键下架为草稿 */}
-          {isEdit && currentStatus === "published" && (
-            <button
-              type="button"
-              onClick={() => handleSave("draft")}
-              disabled={saving !== null}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-amber-300/60 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 disabled:opacity-50 transition-colors cursor-pointer"
-              title="下架此文章并转入草稿箱"
-            >
-              <span>下架为草稿</span>
-            </button>
-          )}
-
-          {/* 正式发布 / 更新发布 */}
+          {/* 文章设置抽屉触发按钮 */}
           <button
             type="button"
-            onClick={() => handleSave("published")}
+            onClick={() => setShowSettingsDrawer(true)}
+            className={`relative inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+              showSettingsDrawer
+                ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                : "border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-input hover:text-adm-text"
+            }`}
+            title="展开文章属性抽屉（封面、分类、标签、发布时间、SEO）"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>设置</span>
+            {cover && (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="已设置封面" />
+            )}
+          </button>
+
+          {/* 正式发布 / 更新发布主按钮 */}
+          <button
+            type="button"
+            onClick={() => handleSave("published", { stay: true })}
             disabled={saving !== null}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 dark:bg-white dark:text-gray-900 dark:hover:bg-emerald-200 disabled:opacity-50 cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-semibold text-white transition-all hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 disabled:opacity-50 cursor-pointer shadow-xs active:scale-95"
+            title="发布并同步至前台 (Ctrl/Cmd+Enter)"
           >
             {saving === "published" ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <CheckCircle2 className="h-3.5 w-3.5" />
             )}
-            <span>{currentStatus === "published" && isEdit ? "更新发布" : "正式发布"}</span>
+            <span>{isEdit && currentStatus === "published" ? "更新发布" : "正式发布"}</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* 操作即时反馈状态条 */}
+      {/* 轻量右上角 Toast 提示 */}
       {saveFeedback && (
-        <div
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-medium transition-all ${
-            saveFeedback.type === "success"
-              ? "border border-emerald-500/30 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-              : "border border-rose-500/30 bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300"
-          }`}
-        >
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
+        <div className="fixed top-14 right-4 sm:right-6 z-50 flex items-center gap-2 rounded-xl border border-adm-border bg-adm-card px-4 py-2.5 text-xs font-medium text-adm-text shadow-xl animate-fade-in-up">
+          {saveFeedback.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+          ) : (
+            <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+          )}
           <span>{saveFeedback.message}</span>
         </div>
       )}
 
-      {/* 可展开的文章高级属性面板（分类、封面、创作类型、权限、发布时间） */}
-      {showSettingsDrawer && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 rounded-2xl border border-adm-border bg-adm-card p-4 sm:p-5 shadow-xs animate-fade-in text-xs">
-          {/* 1. 分类与标签 */}
-          <div className="space-y-2">
-            <label className="block font-semibold text-adm-text">文章分类</label>
-            <div className="flex flex-wrap gap-1.5">
-              {["随笔", "技术", "生活", "思考", "折腾"].map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategory(cat)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition cursor-pointer ${
-                    category === cat
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                      : "bg-adm-input text-adm-text-secondary hover:bg-neutral-200/50 dark:hover:bg-neutral-800"
-                  }`}
-                >
-                  #{cat}
-                </button>
-              ))}
-            </div>
-            <input
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="自定义分类..."
-              className="w-full rounded-lg border border-adm-border bg-adm-bg px-3 py-1.5 text-xs text-adm-text placeholder:text-adm-text-tertiary focus:outline-none"
-            />
+      {/* 本地未保存备份恢复提示条 */}
+      {showRestorePrompt && localBackup && (
+        <div className="mx-4 sm:mx-auto max-w-4xl mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-50/70 dark:bg-amber-950/40 p-3 text-xs text-amber-900 dark:text-amber-200 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <RotateCcw className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>
+              检测到您在 {formatExactDateTime(new Date(localBackup.savedAt).toISOString())} 有一份未提交的本地自动保存草稿
+            </span>
           </div>
-
-          {/* 2. 文章封面（优雅的无干扰卡片，参考 Ghost / Halo CMS） */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block font-semibold text-adm-text flex items-center gap-1">
-                <ImageIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>文章封面</span>
-              </label>
-              {cover ? (
-                <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  已设封面
-                </span>
-              ) : extractFirstMarkdownImage(content) ? (
-                <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
-                  自动首图
-                </span>
-              ) : (
-                <span className="text-[10px] text-adm-text-tertiary">未设封面</span>
-              )}
-            </div>
-
-            {cover ? (
-              <div className="space-y-1.5">
-                <div className="relative group overflow-hidden rounded-xl border border-adm-border bg-neutral-100 dark:bg-neutral-800 aspect-[16/9] w-full">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={toAbsoluteUrl(cover)}
-                    alt="文章封面预览"
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => coverInputRef.current?.click()}
-                      disabled={uploadingCover}
-                      className="rounded-md bg-white/95 dark:bg-neutral-900/95 text-neutral-900 dark:text-white px-2 py-1 text-[11px] font-medium hover:bg-white transition cursor-pointer"
-                    >
-                      {uploadingCover ? <Loader2 className="h-3 w-3 animate-spin" /> : "更换"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMediaPickerOpen(true)}
-                      className="rounded-md bg-white/95 dark:bg-neutral-900/95 text-neutral-900 dark:text-white px-2 py-1 text-[11px] font-medium hover:bg-white transition cursor-pointer"
-                    >
-                      图库
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCover("")}
-                      className="rounded-md bg-rose-600/95 text-white px-2 py-1 text-[11px] font-medium hover:bg-rose-700 transition cursor-pointer"
-                    >
-                      移除
-                    </button>
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  value={cover}
-                  onChange={(e) => setCover(e.target.value)}
-                  placeholder="封面图片 URL..."
-                  className="w-full rounded-lg border border-adm-border bg-adm-bg px-2.5 py-1 text-[11px] text-adm-text placeholder:text-adm-text-tertiary focus:outline-none"
-                />
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <div
-                  onClick={() => coverInputRef.current?.click()}
-                  className="group rounded-xl border border-dashed border-adm-border bg-adm-bg/50 hover:bg-adm-bg transition p-2.5 flex flex-col items-center justify-center gap-1 text-center cursor-pointer min-h-[82px]"
-                >
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 group-hover:scale-105 transition-transform">
-                    {uploadingCover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                  </div>
-                  <p className="text-[11px] font-medium text-adm-text group-hover:text-emerald-600 transition-colors">
-                    {uploadingCover ? "上传中..." : "上传封面图"}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-adm-text-secondary px-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setMediaPickerOpen(true)}
-                    className="hover:text-emerald-600 transition-colors cursor-pointer"
-                  >
-                    素材库
-                  </button>
-                  <span className="text-adm-text-tertiary">·</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowCoverInput(!showCoverInput)}
-                    className="hover:text-emerald-600 transition-colors cursor-pointer"
-                  >
-                    {showCoverInput ? "收起" : "输入链接"}
-                  </button>
-                  {extractFirstMarkdownImage(content) && (
-                    <>
-                      <span className="text-adm-text-tertiary">·</span>
-                      <button
-                        type="button"
-                        onClick={() => setCover(extractFirstMarkdownImage(content))}
-                        className="text-emerald-600 hover:underline cursor-pointer inline-flex items-center gap-0.5"
-                        title="将正文首图提取为封面"
-                      >
-                        <Sparkles className="h-2.5 w-2.5 text-amber-500" />
-                        <span>首图</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {showCoverInput && (
-                  <input
-                    type="text"
-                    value={cover}
-                    onChange={(e) => setCover(e.target.value)}
-                    placeholder="粘贴 https:// 图片链接..."
-                    className="w-full rounded-lg border border-adm-border bg-adm-bg px-2.5 py-1 text-[11px] text-adm-text placeholder:text-adm-text-tertiary focus:outline-none animate-fade-in"
-                  />
-                )}
-              </div>
-            )}
-
-            <input
-              ref={coverInputRef}
-              type="file"
-              accept="image/*"
-              onChange={onCoverChange}
-              className="hidden"
-            />
-          </div>
-
-          {/* 3. 文章类型与配文摘要 */}
-          <div className="space-y-2">
-            <label className="block font-semibold text-adm-text">创作类型与摘要</label>
-            <div className="flex gap-1.5">
-              {[
-                { value: "original", label: "原创" },
-                { value: "repost", label: "转载" },
-                { value: "ai", label: "AI" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setArticleType(opt.value as "original" | "repost" | "ai")}
-                  className={`flex-1 rounded-lg py-1 text-xs font-medium transition text-center cursor-pointer ${
-                    articleType === opt.value
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold"
-                      : "bg-adm-input text-adm-text-secondary hover:bg-neutral-200/50"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            {articleType === "repost" && (
-              <input
-                type="url"
-                value={repostUrl}
-                onChange={(e) => setRepostUrl(e.target.value)}
-                placeholder="https://原文来源链接..."
-                className="w-full rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-950/20 px-3 py-1.5 text-xs text-adm-text placeholder:text-adm-text-tertiary focus:outline-none"
-              />
-            )}
-            <input
-              type="text"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="朋友圈短摘要（卡片配文）..."
-              className="w-full rounded-lg border border-adm-border bg-adm-bg px-3 py-1.5 text-xs text-adm-text placeholder:text-adm-text-tertiary focus:outline-none"
-            />
-          </div>
-
-          {/* 4. 互动权限与置顶 */}
-          <div className="space-y-2">
-            <label className="block font-semibold text-adm-text">权限与置顶</label>
-            <div className="space-y-1.5 text-xs text-adm-text-secondary">
-              <label className="flex items-center justify-between rounded-lg border border-adm-border/60 bg-adm-input/50 px-3 py-1.5 cursor-pointer">
-                <span className="flex items-center gap-1.5">
-                  <Pin className="h-3.5 w-3.5 rotate-45" />
-                  <span>首页置顶</span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={pinned}
-                  onChange={(e) => setPinned(e.target.checked)}
-                  className="rounded text-emerald-600"
-                />
-              </label>
-
-              <label className="flex items-center justify-between rounded-lg border border-adm-border/60 bg-adm-input/50 px-3 py-1.5 cursor-pointer">
-                <span className="flex items-center gap-1.5">
-                  <Heart className="h-3.5 w-3.5" />
-                  <span>允许点赞</span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={!likesDisabled}
-                  onChange={(e) => setLikesDisabled(!e.target.checked)}
-                  className="rounded text-emerald-600"
-                />
-              </label>
-
-              <label className="flex items-center justify-between rounded-lg border border-adm-border/60 bg-adm-input/50 px-3 py-1.5 cursor-pointer">
-                <span className="flex items-center gap-1.5">
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  <span>允许评论</span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={!commentsDisabled}
-                  onChange={(e) => setCommentsDisabled(!e.target.checked)}
-                  className="rounded text-emerald-600"
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* 5. 发布时间设置 */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block font-semibold text-adm-text flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>发布时间</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setPublishTime(toDateTimeLocal(new Date()))}
-                className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
-              >
-                设为现在
-              </button>
-            </div>
-            <input
-              type="datetime-local"
-              value={publishTime}
-              onChange={(e) => setPublishTime(e.target.value)}
-              className="w-full rounded-lg border border-adm-border bg-adm-bg px-2.5 py-1.5 text-xs text-adm-text focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            />
-            <p className="text-[10px] text-adm-text-tertiary leading-relaxed">
-              支持精确指定发布时间（年月日及分秒），前台及文章卡片将如实显示此时间。
-            </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleRestoreBackup}
+              className="rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700 transition cursor-pointer"
+            >
+              一键恢复
+            </button>
+            <button
+              type="button"
+              onClick={handleDiscardBackup}
+              className="text-xs text-adm-text-secondary hover:underline cursor-pointer"
+            >
+              忽略
+            </button>
           </div>
         </div>
       )}
 
-      {/* 核心 Markdown 写作组件：分栏预览、实时高亮、图片截屏拖拽直传 */}
-      <MarkdownEditor
-        value={content}
-        onChange={setContent}
-        token={token}
-        onFrontmatterChange={handleFrontmatterChange}
-        onSave={() => handleSave(currentStatus === "draft" ? "draft" : "published", { stay: true })}
-        minHeight="680px"
-      />
+      {/* 写作正文画布（无边框大标题 + Markdown 大画卷编辑器） */}
+      <main className="flex-1 w-full max-w-[1580px] 2xl:max-w-[1760px] mx-auto px-4 sm:px-8 xl:px-10 flex flex-col space-y-3">
+        {/* 沉浸式大标题输入区（无边框、自适应高度） */}
+        <div className="pt-2 pb-1 border-b border-adm-border/50">
+          <textarea
+            ref={titleTextareaRef}
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              adjustTitleHeight();
+            }}
+            placeholder="输入文章标题..."
+            rows={1}
+            maxLength={200}
+            className="w-full resize-none border-none bg-transparent text-2xl sm:text-4xl font-extrabold tracking-tight text-adm-text placeholder:text-adm-text-tertiary/40 focus:outline-none leading-tight"
+          />
+        </div>
+
+        {/* Markdown 主编辑器组件（开阔视野，自适应视口高度） */}
+        <div className="flex-1 min-h-[calc(100vh-13.5rem)] flex flex-col">
+          <MarkdownEditor
+            value={content}
+            onChange={setContent}
+            token={token}
+            onFrontmatterChange={handleFrontmatterChange}
+            onSave={() => handleSave("draft", { stay: true })}
+            saving={saving !== null}
+            height="calc(100vh - 13.5rem)"
+            minHeight="720px"
+          />
+        </div>
+      </main>
+
+      {/* 右侧文章属性设置抽屉（Inspector Sheet） */}
+      {showSettingsDrawer && (
+        <div className="fixed inset-0 z-40 flex justify-end bg-black/30 backdrop-blur-xs animate-overlay-in">
+          {/* 抽屉容器 */}
+          <div className="relative w-full max-w-md bg-adm-card border-l border-adm-border h-full flex flex-col shadow-2xl animate-fade-in">
+            {/* 抽屉头部 */}
+            <div className="flex items-center justify-between border-b border-adm-border px-5 py-3.5">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-adm-text" />
+                <h3 className="font-bold text-sm text-adm-text">文章发布与设置</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSettingsDrawer(false)}
+                className="rounded-lg p-1.5 text-adm-text-secondary hover:bg-adm-input hover:text-adm-text transition cursor-pointer"
+                title="关闭设置抽屉 (Esc)"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* 抽屉内容区 */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 text-xs [scrollbar-width:thin]">
+              {/* 1. 封面设置 */}
+              <section className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-adm-text flex items-center gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5 text-adm-text-secondary" />
+                    <span>文章封面</span>
+                  </label>
+                  {cover ? (
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">已设置专属封面</span>
+                  ) : extractFirstMarkdownImage(content) ? (
+                    <span className="text-[11px] text-adm-text-tertiary">前台将自动提取正文首图</span>
+                  ) : (
+                    <span className="text-[11px] text-adm-text-tertiary">未设置</span>
+                  )}
+                </div>
+
+                {cover ? (
+                  <div className="space-y-2">
+                    <div className="relative overflow-hidden rounded-xl border border-adm-border bg-adm-input aspect-video w-full">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={toAbsoluteUrl(cover)} alt="封面预览" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => coverInputRef.current?.click()}
+                        disabled={uploadingCover}
+                        className="flex-1 rounded-lg border border-adm-border bg-adm-bg py-1.5 text-center text-xs font-medium text-adm-text hover:bg-adm-input transition cursor-pointer"
+                      >
+                        {uploadingCover ? "上传中..." : "更换图片"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCover}
+                        className="rounded-lg border border-rose-300 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 px-3 py-1.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition cursor-pointer"
+                      >
+                        清除
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div
+                      onClick={() => coverInputRef.current?.click()}
+                      className="flex flex-col items-center justify-center rounded-xl border border-dashed border-adm-border bg-adm-bg/60 p-4 text-center hover:border-adm-text-secondary transition cursor-pointer"
+                    >
+                      <Upload className="h-5 w-5 text-adm-text-tertiary" />
+                      <p className="mt-1.5 text-xs font-medium text-adm-text">点击上传封面图片</p>
+                      <p className="text-[10px] text-adm-text-tertiary">支持 JPG / PNG / WebP，自动优化压缩</p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMediaPickerOpen(true)}
+                        className="flex-1 rounded-lg border border-adm-border bg-adm-bg py-1.5 text-center text-xs text-adm-text-secondary hover:bg-adm-input transition cursor-pointer"
+                      >
+                        从素材库选取
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleExtractCoverFromContent}
+                        className="flex-1 rounded-lg border border-adm-border bg-adm-bg py-1.5 text-center text-xs text-adm-text-secondary hover:bg-adm-input transition cursor-pointer"
+                      >
+                        提取正文首图
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {/* 2. 分类与标签 */}
+              <section className="space-y-2.5">
+                <label className="block font-semibold text-adm-text">文章分类</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CATEGORY_PRESETS.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategory(cat)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition cursor-pointer ${
+                        category === cat
+                          ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
+                          : "bg-adm-input text-adm-text-secondary hover:bg-neutral-200/50 dark:hover:bg-neutral-800"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="输入自定义分类..."
+                  className="w-full rounded-lg border border-adm-border bg-adm-bg px-3 py-1.5 text-xs text-adm-text placeholder:text-adm-text-tertiary focus:outline-none focus:ring-1 focus:ring-adm-text"
+                />
+              </section>
+
+              {/* 3. 朋友圈配文 / 摘要 */}
+              <section className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-semibold text-adm-text">文章摘要 / 动态配文</label>
+                  <span className="text-[10px] text-adm-text-tertiary">展示在列表卡片及前台动态</span>
+                </div>
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  rows={3}
+                  placeholder="留空则自动提取正文首段作为摘要..."
+                  className="w-full rounded-lg border border-adm-border bg-adm-bg p-2.5 text-xs text-adm-text placeholder:text-adm-text-tertiary focus:outline-none focus:ring-1 focus:ring-adm-text resize-none leading-relaxed"
+                />
+              </section>
+
+              {/* 4. 发布时间调度 */}
+              <section className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-semibold text-adm-text flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-adm-text-secondary" />
+                    <span>发布时间</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setPublishTime(toDateTimeLocal(new Date()))}
+                    className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    设为此刻
+                  </button>
+                </div>
+                <input
+                  type="datetime-local"
+                  value={publishTime}
+                  onChange={(e) => setPublishTime(e.target.value)}
+                  className="w-full rounded-lg border border-adm-border bg-adm-bg px-3 py-1.5 text-xs text-adm-text focus:outline-none focus:ring-1 focus:ring-adm-text"
+                />
+                <p className="text-[10px] text-adm-text-tertiary leading-relaxed">
+                  前台博客列表将以此时间进行时间线排序与归档。
+                </p>
+              </section>
+
+              {/* 5. 创作版权类型 */}
+              <section className="space-y-2">
+                <label className="block font-semibold text-adm-text">创作属性</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { key: "original", label: "原创作品" },
+                    { key: "repost", label: "转载文章" },
+                    { key: "ai", label: "AI 辅助" },
+                  ].map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setArticleType(item.key as "original" | "repost" | "ai")}
+                      className={`rounded-lg border px-2 py-1.5 text-center text-xs font-medium transition cursor-pointer ${
+                        articleType === item.key
+                          ? "border-adm-text bg-adm-input text-adm-text font-bold"
+                          : "border-adm-border bg-adm-bg text-adm-text-secondary hover:bg-adm-input"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                {articleType === "repost" && (
+                  <div className="pt-1">
+                    <input
+                      type="url"
+                      value={repostUrl}
+                      onChange={(e) => setRepostUrl(e.target.value)}
+                      placeholder="转载原出处 URL (https://...)"
+                      className="w-full rounded-lg border border-adm-border bg-adm-bg px-3 py-1.5 text-xs text-adm-text placeholder:text-adm-text-tertiary focus:outline-none"
+                    />
+                  </div>
+                )}
+              </section>
+
+              {/* 6. 高级展示与互动权限 */}
+              <section className="space-y-2">
+                <label className="block font-semibold text-adm-text">权限与置顶</label>
+                <div className="space-y-1.5">
+                  <label className="flex items-center justify-between rounded-lg border border-adm-border bg-adm-bg px-3 py-2 cursor-pointer hover:bg-adm-input transition">
+                    <span className="flex items-center gap-2 text-adm-text">
+                      <Pin className="h-3.5 w-3.5 rotate-45 text-adm-text-secondary" />
+                      <span>首页置顶</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={pinned}
+                      onChange={(e) => setPinned(e.target.checked)}
+                      className="rounded accent-zinc-900 dark:accent-white cursor-pointer"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between rounded-lg border border-adm-border bg-adm-bg px-3 py-2 cursor-pointer hover:bg-adm-input transition">
+                    <span className="flex items-center gap-2 text-adm-text">
+                      <Heart className="h-3.5 w-3.5 text-adm-text-secondary" />
+                      <span>允许点赞</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={!likesDisabled}
+                      onChange={(e) => setLikesDisabled(!e.target.checked)}
+                      className="rounded accent-zinc-900 dark:accent-white cursor-pointer"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between rounded-lg border border-adm-border bg-adm-bg px-3 py-2 cursor-pointer hover:bg-adm-input transition">
+                    <span className="flex items-center gap-2 text-adm-text">
+                      <MessageSquare className="h-3.5 w-3.5 text-adm-text-secondary" />
+                      <span>允许评论</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={!commentsDisabled}
+                      onChange={(e) => setCommentsDisabled(!e.target.checked)}
+                      className="rounded accent-zinc-900 dark:accent-white cursor-pointer"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              {/* 7. 下架为草稿操作（已发布文章专属） */}
+              {isEdit && currentStatus === "published" && (
+                <section className="pt-2 border-t border-adm-border">
+                  <button
+                    type="button"
+                    onClick={() => setShowUnpublishConfirm(true)}
+                    className="w-full rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 py-2 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition cursor-pointer"
+                  >
+                    下架并转入草稿箱
+                  </button>
+                </section>
+              )}
+            </div>
+
+            {/* 抽屉底部快捷按钮 */}
+            <div className="border-t border-adm-border p-4 flex items-center justify-between gap-3 bg-adm-bg">
+              <button
+                type="button"
+                onClick={() => setShowSettingsDrawer(false)}
+                className="flex-1 rounded-lg border border-adm-border bg-adm-card py-2 text-xs font-medium text-adm-text hover:bg-adm-input transition cursor-pointer"
+              >
+                完成
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSettingsDrawer(false);
+                  handleSave("published", { stay: true });
+                }}
+                disabled={saving !== null}
+                className="flex-1 rounded-lg bg-zinc-900 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 transition cursor-pointer disabled:opacity-50"
+              >
+                {saving === "published" ? "发布中..." : "立即发布"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 发布成功提示卡片弹窗 */}
+      {publishedSuccessInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-overlay-in">
+          <div className="relative w-full max-w-md rounded-2xl border border-adm-border bg-adm-card p-6 shadow-2xl animate-fade-in text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 mb-3">
+              <Check className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-bold text-adm-text">文章发布成功！</h3>
+            <p className="mt-1 text-xs text-adm-text-secondary leading-relaxed">
+              《{publishedSuccessInfo.title}》已成功发布，并已同步更新至前台页面与订阅源。
+            </p>
+
+            <div className="mt-6 flex flex-col sm:flex-row items-center gap-2">
+              <a
+                href={`/articles/${publishedSuccessInfo.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-adm-border bg-adm-bg px-4 py-2.5 text-xs font-medium text-adm-text hover:bg-adm-input transition cursor-pointer"
+              >
+                <Eye className="h-4 w-4" />
+                <span>新标签页查看</span>
+                <ExternalLink className="h-3 w-3 text-adm-text-tertiary" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setPublishedSuccessInfo(null)}
+                className="w-full flex-1 inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 transition cursor-pointer"
+              >
+                留在当前页继续编辑
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 媒体库选择弹窗 */}
       <MediaPicker
@@ -914,11 +1369,12 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
         onSelect={(item) => {
           setCover(item.url);
           setMediaPickerOpen(false);
+          showFeedback("success", "已选定封面图片");
         }}
         category="image"
       />
 
-      {/* 文章草稿箱弹窗 */}
+      {/* 文章草稿箱抽屉/弹窗 */}
       {showDraftBox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-overlay-in">
           <div className="relative w-full max-w-lg rounded-2xl border border-adm-border bg-adm-card p-5 shadow-2xl max-h-[85vh] flex flex-col animate-modal-in">
@@ -943,7 +1399,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
                 </div>
               ) : draftArticles.length === 0 ? (
                 <div className="py-12 text-center text-xs text-adm-text-tertiary">
-                  草稿箱空空如也，随时可在编辑时点击「存草稿」暂存文章。
+                  草稿箱中暂无文章，随时可在编辑时点击「存草稿」暂存。
                 </div>
               ) : (
                 draftArticles.map((draft) => (
@@ -979,24 +1435,9 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
                       </Link>
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (!confirm("确定彻底删除此草稿？")) return;
-                          try {
-                            const res = await apiFetch(`/posts/${draft.id}`, { method: "DELETE" });
-                            if (res.ok) {
-                              setDraftArticles((prev) => prev.filter((d) => d.id !== draft.id));
-                              if (draft.id === activeArticleId) {
-                                setActiveArticleId(null);
-                                window.history.replaceState(null, "", "/admin/articles/new");
-                              }
-                              notifyContentUpdated();
-                            }
-                          } catch {
-                            alert("删除失败");
-                          }
-                        }}
+                        onClick={() => setDraftToDelete({ id: draft.id, title: draft.title || "无标题草稿" })}
                         className="rounded-lg p-1.5 text-adm-text-tertiary hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 cursor-pointer transition"
-                        title="删除草稿"
+                        title="彻底删除草稿"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -1008,6 +1449,139 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           </div>
         </div>
       )}
+
+      {/* 隐藏的文件输入组件 */}
+      <input
+        ref={markdownFileInputRef}
+        type="file"
+        accept=".md,.markdown,text/markdown,.txt"
+        onChange={handleMarkdownFileSelected}
+        className="hidden"
+      />
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleCoverUpload(file);
+          e.target.value = "";
+        }}
+        className="hidden"
+      />
+
+      {/* 覆盖现有编辑确认弹窗 */}
+      <ConfirmDialog
+        open={showImportConfirm}
+        title="确认导入 Markdown 文件？"
+        message="导入新文件将覆盖当前正在编辑的内容。是否确认继续覆盖？"
+        confirmText="继续导入"
+        cancelText="取消"
+        onConfirm={() => {
+          setShowImportConfirm(false);
+          if (pendingImportFile) {
+            executeImportMarkdown(pendingImportFile);
+            setPendingImportFile(null);
+          }
+        }}
+        onCancel={() => {
+          setShowImportConfirm(false);
+          setPendingImportFile(null);
+        }}
+      />
+
+      {/* 下架为草稿二次确认弹窗 */}
+      <ConfirmDialog
+        open={showUnpublishConfirm}
+        title="确认下架文章？"
+        message="下架后文章将转入草稿箱，前台文章列表将隐藏该文章，随时可在后台重新发布。"
+        confirmText="确认下架"
+        cancelText="取消"
+        danger={true}
+        onConfirm={async () => {
+          setShowUnpublishConfirm(false);
+          setShowSettingsDrawer(false);
+          await handleSave("draft", { stay: true });
+        }}
+        onCancel={() => setShowUnpublishConfirm(false)}
+      />
+
+      {/* 删除草稿确认弹窗 */}
+      <ConfirmDialog
+        open={!!draftToDelete}
+        title="确认彻底删除草稿？"
+        message={`确定彻底删除草稿「${draftToDelete?.title || "未命名草稿"}」？此操作无法撤销。`}
+        confirmText="确认删除"
+        cancelText="取消"
+        danger={true}
+        onConfirm={async () => {
+          if (!draftToDelete) return;
+          const targetId = draftToDelete.id;
+          setDraftToDelete(null);
+          try {
+            const res = await apiFetch(`/posts/${targetId}`, { method: "DELETE" });
+            if (res.ok) {
+              setDraftArticles((prev) => prev.filter((d) => d.id !== targetId));
+              if (targetId === activeArticleId) {
+                setActiveArticleId(null);
+                window.history.replaceState(null, "", "/admin/articles/new");
+              }
+              notifyContentUpdated();
+              showFeedback("success", "草稿已彻底删除");
+            } else {
+              showFeedback("error", "删除草稿失败");
+            }
+          } catch {
+            showFeedback("error", "删除草稿失败");
+          }
+        }}
+        onCancel={() => setDraftToDelete(null)}
+      />
+
+      {/* 离开未保存更改确认弹窗 */}
+      <AdminModal
+        open={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        title="未保存更改确认"
+        width="sm"
+        footer={
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setShowLeaveModal(false)}
+              className="rounded-xl border border-adm-border px-3.5 py-2 text-xs font-medium text-adm-text-secondary hover:bg-adm-input transition cursor-pointer"
+            >
+              留在页面
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowLeaveModal(false);
+                router.push("/admin/articles");
+              }}
+              className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 px-3.5 py-2 text-xs font-medium text-rose-700 dark:text-rose-300 hover:bg-rose-100 transition cursor-pointer"
+            >
+              放弃更改
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                setShowLeaveModal(false);
+                await handleSave("draft");
+                router.push("/admin/articles");
+              }}
+              className="rounded-xl bg-adm-primary px-4 py-2 text-xs font-medium text-adm-primary-text hover:opacity-90 transition cursor-pointer"
+            >
+              存为草稿后离开
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-2 py-2 text-xs leading-relaxed text-adm-text-secondary">
+          <p className="font-semibold text-adm-text">当前文章有未保存的内容。</p>
+          <p>直接离开将放弃本次修改。您可以选择存入草稿箱，或直接离开。</p>
+        </div>
+      </AdminModal>
     </div>
   );
 }

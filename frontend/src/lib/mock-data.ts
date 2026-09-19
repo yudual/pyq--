@@ -89,11 +89,11 @@ export type PostImage = string | { src: string; video?: string };
 export interface Post {
   id: string;
   shortId?: string;
-  /** moment=朋友圈动态（默认），article=长文章，project=项目作品 */
-  type?: "moment" | "article" | "project";
+  /** moment=朋友圈动态（默认），article=长文章，project=项目作品，collection=系列合辑 */
+  type?: "moment" | "article" | "project" | "collection";
   /** 文章标题 */
   title?: string;
-  /** 文章摘要 / 朋友圈配文（article 类型：显示在卡片上方的动态文字） */
+  /** 文章摘要 / 朋友圈配文（article 类型：显示在卡片上方的动态文字；collection 类型：合辑导读） */
   excerpt?: string;
   /** 文章封面图 URL */
   cover?: string;
@@ -125,6 +125,39 @@ export interface Post {
   viewCount?: number;
   /** 发布状态：published=已发布，draft=草稿 */
   status?: "published" | "draft";
+  /** 所属合辑 ID */
+  collectionId?: string | null;
+  /** 所属合辑标题（在文章卡片显示徽标） */
+  collectionTitle?: string | null;
+  /** 所属合辑简略信息 */
+  collection?: { id: string; shortId?: string; title: string } | null;
+  /** 是否在首页隐藏 */
+  hideInHome?: boolean;
+  /** 若自身是合辑，包含的子文章有序 ID 列表 */
+  collectionPostIds?: string[] | null;
+  /** 若自身是合辑，包含的子文章完整数据 */
+  collectionArticles?: Array<{
+    id: string;
+    shortId?: string;
+    title: string;
+    excerpt?: string;
+    cover?: string;
+    category?: string;
+    articleType?: "original" | "repost" | "ai";
+    viewCount?: number;
+    createdAt?: string;
+  }>;
+  /** 文章详情页所属合辑上下文导航 */
+  collectionContext?: {
+    collectionId: string;
+    collectionShortId?: string;
+    collectionTitle: string;
+    posts: Array<{ id: string; shortId?: string; title: string; order: number; isCurrent: boolean }>;
+    currentIndex: number;
+    total: number;
+    prevPost?: { id: string; shortId?: string; title: string } | null;
+    nextPost?: { id: string; shortId?: string; title: string } | null;
+  } | null;
 }
 
 export const owner: User = {

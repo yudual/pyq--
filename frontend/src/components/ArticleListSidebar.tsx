@@ -41,7 +41,6 @@ export default function ArticleListSidebar() {
   const sidebarScrollRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const currentId = pathname?.split("/").pop() || "";
-  const defaultCover = useSiteSettings((s) => s.defaultCover);
 
   useEffect(() => {
     fetch(`${API_URL}/posts?type=article&page=1&limit=20`)
@@ -118,7 +117,7 @@ export default function ArticleListSidebar() {
                         }`}
                       >
                         {(() => {
-                          const cover = resolveCoverImage(article.cover, null, defaultCover);
+                          const cover = resolveCoverImage(article.cover, null);
                           return cover ? (
                             <div className="relative h-12 w-16 shrink-0 overflow-hidden rounded-md bg-wechat-bubble dark:bg-white/5">
                               {/* eslint-disable-next-line @next/next/no-img-element */}

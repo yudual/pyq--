@@ -1,26 +1,36 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
-  Users, FileText, BookText, MessageCircle, Heart, TrendingUp, TrendingDown,
-  Pin, ExternalLink, Plus, X, Settings2, BookUser, Code2, Info, Images,
-  LayoutDashboard, ChevronRight,
+  FileText,
+  BookText,
+  MessageCircle,
+  Heart,
+  PenLine,
+  Settings2,
+  Images,
+  Clock,
+  Pin,
+  ChevronRight,
+  FolderOpen,
+  ArrowUpRight,
 } from "lucide-react";
-import dynamic from "next/dynamic";
 import { apiFetch, getToken } from "@/lib/api-fetch";
 import { renderTextWithEmoji } from "@/lib/emoji";
 
-// echarts 包含 canvas/window 操作，必须客户端动态加载避免 SSR 报错
-const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
-
-interface TimeSeriesItem {
-  date: string;
-  label: string;
-  posts: number;
-  articles: number;
-  comments: number;
-  likes: number;
+interface RecentArticle {
+  id: string;
+  shortId: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  cover: string;
+  status: "published" | "draft";
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface RecentPost {
@@ -40,264 +50,43 @@ interface RecentComment {
   postContent: string;
 }
 
-interface Stats {
+interface DashboardStats {
   users: number;
   posts: number;
   articles: number;
+  draftArticles: number;
   comments: number;
   likes: number;
-  timeSeries: TimeSeriesItem[];
+  recentArticles: RecentArticle[];
   recentPosts: RecentPost[];
   recentComments: RecentComment[];
 }
 
-const ALL_SHORTCUTS = [
-  { key: "articles", label: "文章管理", icon: BookText, href: "/admin/articles", desc: "长文撰写与排版" },
-  { key: "posts", label: "岁岁念与动态", icon: FileText, href: "/admin/posts", desc: "日常随笔与朋友圈碎碎念" },
-  { key: "projects", label: "项目管理", icon: Code2, href: "/admin/projects", desc: "开源与独立开发作品" },
-  { key: "about", label: "关于页自述", icon: Info, href: "/admin/about", desc: "个人后花园介绍" },
-  { key: "media", label: "媒体素材库", icon: Images, href: "/admin/media", desc: "图片与上传资源" },
-  { key: "comments", label: "评论留言", icon: MessageCircle, href: "/admin/comments", desc: "访客互动与审核" },
-  { key: "profile", label: "个人资料 (Hero)", icon: Users, href: "/admin/users", desc: "头像、昵称、个性签名" },
-  { key: "friends", label: "友情链接", icon: BookUser, href: "/admin/friends", desc: "友链管理与展示" },
-  { key: "settings", label: "网站设置", icon: Settings2, href: "/admin/settings", desc: "站点标题与全局配置" },
-  { key: "frontend-home", label: "访问前台首页", icon: ExternalLink, href: "/", external: true, desc: "查看前台实际展示效果" },
-];
-
-function loadShortcuts(): string[] {
-  try {
-    const saved = localStorage.getItem("admin_shortcuts");
-    if (saved) {
-      const parsed: string[] = JSON.parse(saved);
-      const valid = parsed.filter((k) => ALL_SHORTCUTS.some((s) => s.key === k));
-      if (valid.length > 0) return valid;
-    }
-  } catch {}
-  return ["articles", "posts", "projects", "settings"];
-}
-
-function saveShortcuts(keys: string[]) {
-  localStorage.setItem("admin_shortcuts", JSON.stringify(keys));
-}
-
 function timeAgo(dateStr: string): string {
+  if (!dateStr) return "";
   const diff = Date.now() - new Date(dateStr).getTime();
   const min = Math.floor(diff / 60000);
   if (min < 1) return "刚刚";
-  if (min < 60) return `${min}分钟前`;
+  if (min < 60) return `${min} 分钟前`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}小时前`;
+  if (hr < 24) return `${hr} 小时前`;
   const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}天前`;
+  if (day < 30) return `${day} 天前`;
   return new Date(dateStr).toLocaleDateString("zh-CN");
 }
 
-/** 解码 HTML 实体（如 &nbsp; &amp; 等），用于展示后端返回的已去标签文本 */
 function decodeHtmlEntities(text: string): string {
   if (!text) return "";
+  if (typeof document === "undefined") return text;
   const txt = document.createElement("textarea");
   txt.innerHTML = text;
   return txt.value;
 }
 
-/** 检测当前是否暗色模式（基于 html.dark 类） */
-function useIsDark() {
-  const [dark, setDark] = useState(false);
-  useEffect(() => {
-    const el = document.documentElement;
-    const update = () => setDark(el.classList.contains("dark"));
-    update();
-    const observer = new MutationObserver(update);
-    observer.observe(el, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-  return dark;
-}
-
-/** echarts 柱状图：近7天活动趋势（动态/评论/点赞） */
-function BarChart({ data }: { data: TimeSeriesItem[] }) {
-  const isDark = useIsDark();
-  const textColor = isDark ? "rgba(255,255,255,0.65)" : "rgba(0,0,0,0.65)";
-  const axisLineColor = isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)";
-
-  const option = useMemo(() => ({
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-      backgroundColor: isDark ? "rgba(30,30,30,0.95)" : "rgba(255,255,255,0.95)",
-      borderColor: axisLineColor,
-      textStyle: { color: textColor, fontSize: 12 },
-    },
-    legend: {
-      data: ["动态", "文章", "评论", "点赞"],
-      top: 0,
-      right: 0,
-      icon: "circle",
-      itemWidth: 8,
-      itemHeight: 8,
-      textStyle: { color: textColor, fontSize: 11 },
-    },
-    grid: { left: "2%", right: "2%", bottom: "2%", top: 36, containLabel: true },
-    xAxis: {
-      type: "category",
-      data: data.map((d) => d.label),
-      axisLine: { lineStyle: { color: axisLineColor } },
-      axisTick: { show: false },
-      axisLabel: { color: textColor, fontSize: 10 },
-    },
-    yAxis: {
-      type: "value",
-      minInterval: 1,
-      axisLine: { show: false },
-      axisTick: { show: false },
-      splitLine: { lineStyle: { color: axisLineColor, type: "dashed" } },
-      axisLabel: { color: textColor, fontSize: 10 },
-    },
-    series: [
-      { name: "动态", type: "bar", data: data.map((d) => d.posts), itemStyle: { color: "#3b82f6", borderRadius: [3, 3, 0, 0] }, barGap: "10%", barCategoryGap: "30%" },
-      { name: "文章", type: "bar", data: data.map((d) => d.articles), itemStyle: { color: "#8b5cf6", borderRadius: [3, 3, 0, 0] } },
-      { name: "评论", type: "bar", data: data.map((d) => d.comments), itemStyle: { color: "#f43f5e", borderRadius: [3, 3, 0, 0] } },
-      { name: "点赞", type: "bar", data: data.map((d) => d.likes), itemStyle: { color: "#f59e0b", borderRadius: [3, 3, 0, 0] } },
-    ],
-  }), [data, isDark, textColor, axisLineColor]);
-
-  return (
-    <ReactECharts
-      option={option}
-      style={{ height: 240, width: "100%" }}
-      opts={{ renderer: "svg" }}
-      notMerge
-    />
-  );
-}
-
-/** echarts 环形图：内容分布（动态/文章/评论/点赞） */
-function DonutChart({ items }: { items: { label: string; value: number; color: string }[] }) {
-  const isDark = useIsDark();
-  const textColor = isDark ? "rgba(255,255,255,0.65)" : "rgba(0,0,0,0.65)";
-  const total = items.reduce((s, i) => s + i.value, 0);
-
-  const option = useMemo(() => ({
-    tooltip: {
-      trigger: "item",
-      formatter: "{b}: {c} ({d}%)",
-      backgroundColor: isDark ? "rgba(30,30,30,0.95)" : "rgba(255,255,255,0.95)",
-      borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
-      textStyle: { color: textColor, fontSize: 12 },
-    },
-    legend: {
-      orient: "vertical",
-      right: 0,
-      top: "center",
-      icon: "circle",
-      itemWidth: 8,
-      itemHeight: 8,
-      textStyle: { color: textColor, fontSize: 11 },
-      formatter: (name: string) => {
-        const item = items.find((i) => i.label === name);
-        return `${name}  ${item ? item.value : 0}`;
-      },
-    },
-    graphic: {
-      type: "text",
-      left: "28%",
-      top: "center",
-      style: {
-        text: `{a|${total}}\n{b|总数}`,
-        rich: {
-          a: { fontSize: 22, fontWeight: 700, fill: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)", align: "center" },
-          b: { fontSize: 11, fill: textColor, align: "center" },
-        },
-        textAlign: "center",
-      },
-    },
-    series: [{
-      type: "pie",
-      radius: ["55%", "75%"],
-      center: ["28%", "50%"],
-      avoidLabelOverlap: false,
-      label: { show: false },
-      labelLine: { show: false },
-      itemStyle: { borderColor: isDark ? "rgba(30,30,30,1)" : "rgba(255,255,255,1)", borderWidth: 2 },
-      emphasis: { label: { show: true, fontSize: 14, fontWeight: "bold" } },
-      data: items.map((i) => ({ name: i.label, value: i.value, itemStyle: { color: i.color } })),
-    }],
-  }), [items, isDark, textColor, total]);
-
-  return (
-    <ReactECharts
-      option={option}
-      style={{ height: 180, width: "100%" }}
-      opts={{ renderer: "svg" }}
-      notMerge
-    />
-  );
-}
-
-const fallbackStats: Stats = {
-  users: 1,
-  posts: 6,
-  articles: 2,
-  comments: 12,
-  likes: 24,
-  timeSeries: [
-    { date: "03-05", label: "03-05", posts: 1, articles: 0, comments: 2, likes: 3 },
-    { date: "03-06", label: "03-06", posts: 0, articles: 1, comments: 1, likes: 4 },
-    { date: "03-07", label: "03-07", posts: 2, articles: 0, comments: 3, likes: 5 },
-    { date: "03-08", label: "03-08", posts: 1, articles: 0, comments: 2, likes: 2 },
-    { date: "03-09", label: "03-09", posts: 1, articles: 1, comments: 4, likes: 6 },
-    { date: "03-10", label: "03-10", posts: 0, articles: 0, comments: 1, likes: 2 },
-    { date: "03-11", label: "03-11", posts: 1, articles: 0, comments: 3, likes: 4 },
-  ],
-  recentPosts: [
-    {
-      id: "post-art-1",
-      content: "从零构筑一座数字花园：在碎片化时代重拾专注与自我沉淀",
-      createdAt: new Date().toISOString(),
-      pinned: true,
-      author: "小予",
-    },
-    {
-      id: "post-proj-1",
-      content: "🛠️ 【独立折腾】发布了一款极简本地优先写作卡片工具「MiniMark」",
-      createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-      pinned: true,
-      author: "小予",
-    },
-    {
-      id: "post-mom-1",
-      content: "最近重温完《葬送的芙莉莲》，再次被这种克制而深刻的情绪打动。",
-      createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-      pinned: false,
-      author: "小予",
-    },
-  ],
-  recentComments: [
-    {
-      id: "c1",
-      author: "CC",
-      content: "很赞同这句‘灵感就像清晨的露珠’，个人主页确实该多一些这种安静的文字！",
-      createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-      postAuthor: "小予",
-      postContent: "从零构筑一座数字花园",
-    },
-    {
-      id: "c2",
-      author: "雁七",
-      content: "排版非常舒服，看得很享受～期待下一篇！",
-      createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-      postAuthor: "小予",
-      postContent: "从零构筑一座数字花园",
-    },
-  ],
-};
-
 export default function AdminDashboard() {
   const router = useRouter();
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [shortcuts, setShortcuts] = useState<string[]>([]);
-  const [editingShortcuts, setEditingShortcuts] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -305,276 +94,349 @@ export default function AdminDashboard() {
       router.replace("/admin/login");
       return;
     }
-    setShortcuts(loadShortcuts());
+
     apiFetch("/admin/dashboard")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data && typeof data.posts === "number") {
-          setStats(data);
-        } else {
-          setStats(fallbackStats);
+        if (data && typeof data.articles === "number") {
+          setStats({
+            users: data.users || 0,
+            posts: data.posts || 0,
+            articles: data.articles || 0,
+            draftArticles: data.draftArticles || 0,
+            comments: data.comments || 0,
+            likes: data.likes || 0,
+            recentArticles: data.recentArticles || [],
+            recentPosts: data.recentPosts || [],
+            recentComments: data.recentComments || [],
+          });
         }
       })
-      .catch(() => setStats(fallbackStats))
+      .catch((err) => {
+        console.error("加载仪表盘数据异常:", err);
+      })
       .finally(() => setLoading(false));
   }, [router]);
 
-  const toggleShortcut = (key: string) => {
-    setShortcuts((prev) => {
-      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
-      saveShortcuts(next);
-      return next;
-    });
-  };
-
-  // 趋势计算（今天 vs 昨天）
-  const trend = useMemo(() => {
-    if (!stats?.timeSeries || stats.timeSeries.length < 2) return null;
-    const today = stats.timeSeries[stats.timeSeries.length - 1];
-    const yesterday = stats.timeSeries[stats.timeSeries.length - 2];
-    const calc = (t: number, y: number) => {
-      if (y === 0) return t > 0 ? 100 : 0;
-      return Math.round(((t - y) / y) * 100);
-    };
-    return {
-      posts: calc(today.posts, yesterday.posts),
-      articles: calc(today.articles, yesterday.articles),
-      comments: calc(today.comments, yesterday.comments),
-      likes: calc(today.likes, yesterday.likes),
-    };
-  }, [stats]);
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-adm-border border-t-adm-text" />
+      <div className="flex h-64 items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-adm-border border-t-adm-text" />
+          <span className="text-xs text-adm-text-secondary">加载工作台概览...</span>
+        </div>
       </div>
     );
   }
 
-  const cards = [
+  const statCards = [
     {
-      label: "动态", value: stats?.posts || 0, icon: FileText,
-      trend: trend?.posts ?? null, color: "text-[#3b82f6]",
+      label: "已发布文章",
+      value: stats?.articles || 0,
+      subText: "篇长文与系列",
+      href: "/admin/articles",
+      icon: BookText,
     },
     {
-      label: "文章", value: stats?.articles || 0, icon: BookText,
-      trend: trend?.articles ?? null, color: "text-[#8b5cf6]",
+      label: "草稿箱待发",
+      value: stats?.draftArticles || 0,
+      subText: stats?.draftArticles ? "有未发布的创作草稿" : "草稿箱全部已清空",
+      href: "/admin/articles?status=draft",
+      icon: FolderOpen,
+      highlight: (stats?.draftArticles || 0) > 0,
     },
     {
-      label: "评论", value: stats?.comments || 0, icon: MessageCircle,
-      trend: trend?.comments ?? null, color: "text-[#f43f5e]",
+      label: "岁岁念与动态",
+      value: stats?.posts || 0,
+      subText: "条日常随笔记录",
+      href: "/admin/posts",
+      icon: FileText,
     },
     {
-      label: "点赞", value: stats?.likes || 0, icon: Heart,
-      trend: trend?.likes ?? null, color: "text-[#f59e0b]",
+      label: "访客评论",
+      value: stats?.comments || 0,
+      subText: "条读者留言互动",
+      href: "/admin/comments",
+      icon: MessageCircle,
     },
-  ];
-
-  const activeShortcuts = ALL_SHORTCUTS.filter((s) => shortcuts.includes(s.key));
-  const inactiveShortcuts = ALL_SHORTCUTS.filter((s) => !shortcuts.includes(s.key));
-
-  const donutItems = [
-    { label: "动态", value: stats?.posts || 0, color: "#3b82f6" },
-    { label: "文章", value: stats?.articles || 0, color: "#8b5cf6" },
-    { label: "评论", value: stats?.comments || 0, color: "#f43f5e" },
-    { label: "点赞", value: stats?.likes || 0, color: "#f59e0b" },
+    {
+      label: "全站获赞",
+      value: stats?.likes || 0,
+      subText: "次读者点赞认同",
+      href: "#",
+      icon: Heart,
+    },
   ];
 
   return (
-    <div>
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-adm-input">
-          <LayoutDashboard className="h-5 w-5 text-adm-text-secondary" />
-        </div>
+    <div className="space-y-5 pb-12">
+      {/* 顶部标题与快速写文章 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-adm-border pb-4">
         <div>
-          <h2 className="text-xl font-bold text-adm-text">仪表盘</h2>
-          <p className="text-sm text-adm-text-secondary">博客数据概览与快捷操作</p>
+          <h1 className="text-xl font-bold text-adm-text">工作台概览</h1>
+          <p className="mt-0.5 text-xs text-adm-text-secondary">
+            博客内容管理、近期创作进度与互动动态
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/articles"
+            className="rounded-xl border border-adm-border bg-adm-card px-3.5 py-2 text-xs font-medium text-adm-text hover:bg-adm-card-hover transition-colors"
+          >
+            文章列表
+          </Link>
+          <Link
+            href="/admin/articles/new"
+            className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+          >
+            <PenLine className="h-3.5 w-3.5" />
+            <span>撰写新文章</span>
+          </Link>
         </div>
       </div>
 
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {cards.map((card) => {
+      {/* 核心指标统计卡片 */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {statCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="rounded-2xl border border-adm-border bg-adm-card p-4 transition-shadow hover:shadow-sm">
+            <Link
+              key={card.label}
+              href={card.href}
+              className={`group flex flex-col justify-between rounded-2xl border p-4 transition-all hover:border-adm-text-tertiary ${
+                card.highlight
+                  ? "border-amber-300/80 bg-amber-50/40 dark:border-amber-700/60 dark:bg-amber-950/20"
+                  : "border-adm-border bg-adm-card"
+              }`}
+            >
               <div className="flex items-center justify-between">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-adm-input">
-                  <Icon className={`h-[18px] w-[18px] ${card.color}`} />
+                <span className="text-xs font-medium text-adm-text-secondary">
+                  {card.label}
+                </span>
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-adm-input text-adm-text-tertiary group-hover:text-adm-text transition-colors">
+                  <Icon className="h-3.5 w-3.5" />
                 </div>
-                {card.trend !== null && (
-                  <span className={`flex items-center gap-0.5 text-xs font-medium ${card.trend > 0 ? "text-adm-primary" : card.trend < 0 ? "text-adm-danger" : "text-adm-text-tertiary"}`}>
-                    {card.trend > 0 ? <TrendingUp className="h-3 w-3" /> : card.trend < 0 ? <TrendingDown className="h-3 w-3" /> : null}
-                    {card.trend > 0 ? `+${card.trend}%` : card.trend < 0 ? `${card.trend}%` : "0%"}
-                  </span>
-                )}
               </div>
-              <div className="mt-3 text-2xl font-bold text-adm-text">{card.value}</div>
-              <div className="text-xs text-adm-text-secondary">{card.label}</div>
-            </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold tracking-tight text-adm-text">
+                  {card.value}
+                </div>
+                <div className="mt-0.5 truncate text-[11px] text-adm-text-tertiary">
+                  {card.subText}
+                </div>
+              </div>
+            </Link>
           );
         })}
       </div>
 
-      {/* 图表区域 */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* 柱状图 */}
-        <div className="rounded-2xl border border-adm-border bg-adm-card p-5 lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-adm-text">近7天活动趋势</h3>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#3b82f6]" />动态</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#8b5cf6]" />文章</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#f43f5e]" />评论</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#f59e0b]" />点赞</span>
-            </div>
-          </div>
-          {stats?.timeSeries && <BarChart data={stats.timeSeries} />}
-        </div>
-
-        {/* 环形图 */}
-        <div className="rounded-2xl border border-adm-border bg-adm-card p-5">
-          <h3 className="mb-4 text-sm font-semibold text-adm-text">内容分布</h3>
-          <DonutChart items={donutItems} />
-        </div>
-      </div>
-
-      {/* 快捷操作 */}
-      <div className="mt-4 rounded-2xl border border-adm-border bg-adm-card p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-adm-text">快捷操作</h3>
-          <button
-            onClick={() => setEditingShortcuts(!editingShortcuts)}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
+      {/* 常用管理入口 */}
+      <div className="rounded-2xl border border-adm-border bg-adm-card p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wider text-adm-text-tertiary">
+            内容与频道快捷入口
+          </span>
+          <Link
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-adm-text-secondary hover:text-adm-text"
           >
-            {editingShortcuts ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-            {editingShortcuts ? "完成" : "自定义"}
-          </button>
+            <span>访问博客前台</span>
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {activeShortcuts.map((s) => {
-            const Icon = s.icon;
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+          {[
+            { label: "写新文章", href: "/admin/articles/new", icon: PenLine },
+            { label: "文章合辑", href: "/admin/articles", icon: BookText },
+            { label: "动态与微语", href: "/admin/posts", icon: FileText },
+            { label: "素材媒体库", href: "/admin/media", icon: Images },
+            { label: "留言审核", href: "/admin/comments", icon: MessageCircle },
+            { label: "全局设置", href: "/admin/settings", icon: Settings2 },
+          ].map((item) => {
+            const Icon = item.icon;
             return (
-              <button
-                key={s.key}
-                onClick={() => s.external ? window.open(s.href, "_blank") : router.push(s.href)}
-                className="group flex items-center gap-3 rounded-xl border border-adm-border bg-adm-input/50 px-3 py-2.5 text-left transition-colors hover:border-adm-text-tertiary hover:bg-adm-card-hover"
+              <Link
+                key={item.label}
+                href={item.href}
+                className="flex items-center gap-2.5 rounded-xl border border-adm-border/60 bg-adm-bg/60 p-2.5 text-xs text-adm-text hover:bg-adm-input hover:border-adm-border transition-colors"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-adm-input">
-                  <Icon className="h-4 w-4 text-adm-text-secondary" />
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-adm-card border border-adm-border text-adm-text-secondary">
+                  <Icon className="h-3.5 w-3.5" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-adm-text">{s.label}</p>
-                  <p className="truncate text-xs text-adm-text-tertiary">{s.desc}</p>
-                </div>
-                {s.external ? (
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-adm-text-tertiary" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-adm-text-tertiary transition-transform group-hover:translate-x-0.5" />
-                )}
-              </button>
+                <span className="font-medium truncate">{item.label}</span>
+              </Link>
             );
           })}
         </div>
-
-        {editingShortcuts && inactiveShortcuts.length > 0 && (
-          <div className="mt-3 border-t border-adm-border pt-3">
-            <p className="mb-2 text-xs text-adm-text-tertiary">添加快捷操作</p>
-            <div className="flex flex-wrap gap-2">
-              {inactiveShortcuts.map((s) => {
-                const Icon = s.icon;
-                return (
-                  <button
-                    key={s.key}
-                    onClick={() => toggleShortcut(s.key)}
-                    className="flex items-center gap-2 rounded-lg border border-dashed border-adm-border bg-adm-input/30 px-3 py-1.5 text-xs text-adm-text-secondary transition-colors hover:border-adm-primary hover:text-adm-primary"
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {s.label}
-                    <Plus className="h-3 w-3" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {editingShortcuts && activeShortcuts.length > 0 && (
-          <div className="mt-3 border-t border-adm-border pt-3">
-            <p className="mb-2 text-xs text-adm-text-tertiary">点击移除</p>
-            <div className="flex flex-wrap gap-2">
-              {activeShortcuts.map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => toggleShortcut(s.key)}
-                  className="flex items-center gap-2 rounded-lg bg-adm-card-hover px-3 py-1.5 text-xs text-adm-text-secondary transition-colors hover:text-adm-danger"
-                >
-                  {s.label}
-                  <X className="h-3 w-3" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* 最近动态 + 最近评论 */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* 最近动态 */}
-        <div className="rounded-2xl border border-adm-border bg-adm-card p-5">
-          <h3 className="mb-3 text-sm font-semibold text-adm-text">最近动态</h3>
-          {stats?.recentPosts && stats.recentPosts.length > 0 ? (
-            <div className="space-y-2">
-              {stats.recentPosts.map((post) => (
-                <div key={post.id} className="flex items-start gap-2.5 rounded-lg p-2 transition-colors hover:bg-adm-card-hover">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium text-adm-text">{post.author}</span>
-                      {post.pinned && <Pin className="h-3 w-3 text-adm-primary" />}
-                      <span className="text-xs text-adm-text-tertiary">{timeAgo(post.createdAt)}</span>
-                    </div>
-                    <p className="mt-0.5 line-clamp-1 text-xs text-adm-text-secondary">
-                      {decodeHtmlEntities(post.content) || "(无文字内容)"}
-                    </p>
-                  </div>
-                </div>
-              ))}
+      {/* 主面板分栏：左侧最近编辑文章，右侧最新互动与动态 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* 左侧两列：最近编辑文章 */}
+        <div className="lg:col-span-2 rounded-2xl border border-adm-border bg-adm-card p-5 flex flex-col justify-between">
+          <div>
+            <div className="mb-4 flex items-center justify-between border-b border-adm-border pb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-adm-text-secondary" />
+                <h2 className="text-sm font-semibold text-adm-text">最近撰写与编辑文章</h2>
+              </div>
+              <Link
+                href="/admin/articles"
+                className="text-xs text-adm-text-secondary hover:text-adm-text flex items-center gap-0.5"
+              >
+                <span>查看全部</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
-          ) : (
-            <p className="py-6 text-center text-xs text-adm-text-tertiary">暂无动态</p>
-          )}
+
+            {stats?.recentArticles && stats.recentArticles.length > 0 ? (
+              <div className="divide-y divide-adm-border/60">
+                {stats.recentArticles.map((article) => (
+                  <div
+                    key={article.id}
+                    className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/admin/articles/${article.id}`}
+                          className="font-medium text-sm text-adm-text hover:underline truncate"
+                        >
+                          {article.title || "无标题文章"}
+                        </Link>
+                        {article.status === "draft" && (
+                          <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.2 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                            草稿
+                          </span>
+                        )}
+                        {article.pinned && (
+                          <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.2 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            置顶
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-adm-text-tertiary">
+                        {article.category && (
+                          <span className="rounded bg-adm-input px-1.5 py-0.5 text-[11px]">
+                            {article.category}
+                          </span>
+                        )}
+                        <span>更新于 {timeAgo(article.updatedAt || article.createdAt)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {article.status === "published" && (
+                        <Link
+                          href={`/articles/${article.shortId || article.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg border border-adm-border px-2.5 py-1 text-xs text-adm-text-secondary hover:bg-adm-input hover:text-adm-text transition-colors"
+                          title="前台新窗口浏览"
+                        >
+                          前台查看
+                        </Link>
+                      )}
+                      <Link
+                        href={`/admin/articles/${article.id}`}
+                        className="rounded-lg bg-adm-primary px-3 py-1 text-xs font-medium text-adm-primary-text hover:opacity-90 transition"
+                      >
+                        继续编辑
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-xs text-adm-text-tertiary">
+                暂无文章记录，随时可点击上方「撰写新文章」开始记录。
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-adm-border flex items-center justify-between text-xs text-adm-text-secondary">
+            <span>支持实时自动解析 Frontmatter 与 GFM 格式</span>
+            <Link href="/admin/articles/new" className="text-adm-text hover:underline">
+              新建文章 →
+            </Link>
+          </div>
         </div>
 
-        {/* 最近评论 */}
-        <div className="rounded-2xl border border-adm-border bg-adm-card p-5">
-          <h3 className="mb-3 text-sm font-semibold text-adm-text">最近评论</h3>
-          {stats?.recentComments && stats.recentComments.length > 0 ? (
-            <div className="space-y-2">
-              {stats.recentComments.map((comment) => (
-                <div key={comment.id} className="flex items-start gap-2.5 rounded-lg p-2 transition-colors hover:bg-adm-card-hover">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium text-adm-text">{comment.author}</span>
-                      <span className="text-xs text-adm-text-tertiary">{timeAgo(comment.createdAt)}</span>
+        {/* 右侧单列：最新动态与最新评论 */}
+        <div className="space-y-5">
+          {/* 最新读者评论 */}
+          <div className="rounded-2xl border border-adm-border bg-adm-card p-4">
+            <div className="mb-3 flex items-center justify-between border-b border-adm-border pb-2.5">
+              <div className="flex items-center gap-1.5">
+                <MessageCircle className="h-4 w-4 text-adm-text-secondary" />
+                <h3 className="text-xs font-semibold text-adm-text">最新读者评论</h3>
+              </div>
+              <Link href="/admin/comments" className="text-xs text-adm-text-secondary hover:text-adm-text">
+                管理留言
+              </Link>
+            </div>
+
+            {stats?.recentComments && stats.recentComments.length > 0 ? (
+              <div className="space-y-2.5">
+                {stats.recentComments.slice(0, 4).map((c) => (
+                  <div key={c.id} className="rounded-xl bg-adm-bg/60 p-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-adm-text">{c.author || "匿名读者"}</span>
+                      <span className="text-[11px] text-adm-text-tertiary">{timeAgo(c.createdAt)}</span>
                     </div>
                     <p
-                      className="mt-0.5 line-clamp-1 text-xs text-adm-text-secondary"
-                      dangerouslySetInnerHTML={{ __html: renderTextWithEmoji(comment.content) }}
+                      className="mt-1 line-clamp-2 text-adm-text-secondary"
+                      dangerouslySetInnerHTML={{ __html: renderTextWithEmoji(c.content) }}
                     />
-                    {comment.postContent && (
-                      <p className="mt-0.5 line-clamp-1 text-[11px] text-adm-text-tertiary">
-                        <span className="text-adm-text-tertiary/70">来自</span> {comment.postAuthor}：{decodeHtmlEntities(comment.postContent)}
-                      </p>
+                    {c.postContent && (
+                      <div className="mt-1 truncate text-[10px] text-adm-text-tertiary">
+                        来自: {decodeHtmlEntities(c.postContent)}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            ) : (
+              <p className="py-6 text-center text-xs text-adm-text-tertiary">暂无新的评论留言</p>
+            )}
+          </div>
+
+          {/* 最新动态记录 */}
+          <div className="rounded-2xl border border-adm-border bg-adm-card p-4">
+            <div className="mb-3 flex items-center justify-between border-b border-adm-border pb-2.5">
+              <div className="flex items-center gap-1.5">
+                <FileText className="h-4 w-4 text-adm-text-secondary" />
+                <h3 className="text-xs font-semibold text-adm-text">最新动态随笔</h3>
+              </div>
+              <Link href="/admin/posts" className="text-xs text-adm-text-secondary hover:text-adm-text">
+                动态管理
+              </Link>
             </div>
-          ) : (
-            <p className="py-6 text-center text-xs text-adm-text-tertiary">暂无评论</p>
-          )}
+
+            {stats?.recentPosts && stats.recentPosts.length > 0 ? (
+              <div className="space-y-2">
+                {stats.recentPosts.slice(0, 3).map((p) => (
+                  <div key={p.id} className="rounded-xl border border-adm-border/50 p-2.5 text-xs">
+                    <div className="flex items-center justify-between text-adm-text-tertiary text-[11px]">
+                      <div className="flex items-center gap-1">
+                        <span>{p.author || "作者"}</span>
+                        {p.pinned && <Pin className="h-3 w-3 text-adm-text rotate-45" />}
+                      </div>
+                      <span>{timeAgo(p.createdAt)}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-adm-text-secondary">
+                      {decodeHtmlEntities(p.content) || "(无文字内容)"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-6 text-center text-xs text-adm-text-tertiary">暂无动态记录</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

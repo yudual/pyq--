@@ -11,5 +11,5 @@ export default async function EditArticlePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <ArticleEditorPage articleId={id} />;
+  return <ArticleEditorPage key={id} articleId={id} />;
 }

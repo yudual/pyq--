@@ -3,11 +3,18 @@
 import { useSiteSettings } from "@/lib/site-settings-store";
 import { toAbsoluteUrl } from "@/lib/upload";
 
-export default function DesktopDecorations() {
-  const decorationImage = useSiteSettings((s) => s.decorationImage);
+interface DesktopDecorationsProps {
+  image?: string;
+}
+
+export default function DesktopDecorations({ image }: DesktopDecorationsProps = {}) {
+  const storeDecoration = useSiteSettings((s) => s.decorationImage);
   const loaded = useSiteSettings((s) => s.loaded);
 
-  if (!loaded || !decorationImage) return null;
+  const decorationImage = image || storeDecoration;
+
+  if (!image && (!loaded || !decorationImage)) return null;
+  if (!decorationImage) return null;
 
   return (
     <div className="pointer-events-none fixed inset-0 hidden overflow-hidden md:block">

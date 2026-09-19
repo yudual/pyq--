@@ -59,10 +59,10 @@ interface PostAttributes {
   id: string;
   shortId: string;
   userId: string;
-  /** moment=朋友圈动态（默认），article=长文章（带标题/封面/摘要） */
-  type: "moment" | "article";
+  /** moment=朋友圈动态（默认），article=长文章，collection=系列合辑卡片 */
+  type: "moment" | "article" | "collection";
   title: string;
-  /** 文章摘要；article 类型也用作朋友圈配文 */
+  /** 文章摘要；article 类型也用作朋友圈配文；collection 用作合辑介绍 */
   excerpt: string;
   cover: string;
   category: string;
@@ -88,11 +88,17 @@ interface PostAttributes {
   viewCount: number;
   /** 发布状态：published=已发布（默认），draft=草稿（不在前端显示） */
   status: "published" | "draft";
+  /** 所属合辑 ID（若文章被合并到合辑中） */
+  collectionId?: string | null;
+  /** 是否在首页信息流隐藏（若属于合辑且由合辑代表展示） */
+  hideInHome?: boolean;
+  /** 若自身为合辑，记录包含的子文章有序 ID 列表 */
+  collectionPostIds?: string[] | null;
   /** 发布时间（可自定义） */
   createdAt?: Date;
 }
 
-interface PostCreationAttributes extends Optional<PostAttributes, "id" | "shortId" | "type" | "title" | "excerpt" | "cover" | "category" | "pinned" | "likesDisabled" | "commentsDisabled" | "ip" | "region" | "articleType" | "repostUrl" | "viewCount" | "status" | "createdAt"> {}
+interface PostCreationAttributes extends Optional<PostAttributes, "id" | "shortId" | "type" | "title" | "excerpt" | "cover" | "category" | "pinned" | "likesDisabled" | "commentsDisabled" | "ip" | "region" | "articleType" | "repostUrl" | "viewCount" | "status" | "collectionId" | "hideInHome" | "collectionPostIds" | "createdAt"> {}
 
 class Post
   extends Model<PostAttributes, PostCreationAttributes>
@@ -101,7 +107,7 @@ class Post
   declare id: string;
   declare shortId: string;
   declare userId: string;
-  declare type: "moment" | "article";
+  declare type: "moment" | "article" | "collection";
   declare title: string;
   declare excerpt: string;
   declare cover: string;
@@ -122,6 +128,9 @@ class Post
   declare repostUrl: string;
   declare viewCount: number;
   declare status: "published" | "draft";
+  declare collectionId?: string | null;
+  declare hideInHome?: boolean;
+  declare collectionPostIds?: string[] | null;
   declare createdAt: Date;
   declare readonly updatedAt: Date;
   // Association
@@ -150,7 +159,7 @@ Post.init(
       onDelete: "CASCADE",
     },
     type: {
-      type: DataTypes.ENUM("moment", "article"),
+      type: DataTypes.STRING(32),
       allowNull: false,
       defaultValue: "moment",
     },
@@ -251,6 +260,24 @@ Post.init(
       type: DataTypes.ENUM("published", "draft"),
       allowNull: false,
       defaultValue: "published",
+    },
+    collectionId: {
+      type: DataTypes.CHAR(36),
+      allowNull: true,
+      defaultValue: null,
+      field: "collection_id",
+    },
+    hideInHome: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: "hide_in_home",
+    },
+    collectionPostIds: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: null,
+      field: "collection_post_ids",
     },
   },
   {

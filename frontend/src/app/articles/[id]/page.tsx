@@ -72,12 +72,12 @@ export default async function ArticleDetailPage({
   }
 
   return (
-    <div id="scroll-root" className="relative min-h-screen overflow-x-hidden bg-wechat-white md:bg-wechat-bg transition-colors">
+    <div id="scroll-root" className="relative min-h-screen overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations />
 
       {/* 居中自适应博客阅读容器与右侧目录 */}
-      <div className="relative mx-auto w-full max-w-6xl xl:max-w-7xl px-3 sm:px-6 pt-18 sm:pt-24 pb-16 flex justify-center items-start gap-8">
-        <div className="w-full max-w-4xl min-w-0 flex-1 flex flex-col">
+      <div className="relative mx-auto w-full max-w-[1440px] xl:max-w-[1600px] 2xl:max-w-[1720px] px-3 sm:px-6 lg:px-8 pt-18 sm:pt-24 pb-16 flex justify-center items-start gap-8 xl:gap-10">
+        <div className="w-full flex-1 min-w-0 max-w-[980px] xl:max-w-[1100px] 2xl:max-w-[1200px] flex flex-col">
           {/* 返回文章列表 */}
           <div className="mb-4 sm:mb-6">
             <Link
@@ -101,9 +101,9 @@ export default async function ArticleDetailPage({
           </main>
         </div>
 
-        {/* 桌面端右侧章节目录 (>= 1024px 显示，sticky跟随滚动) */}
+        {/* 桌面端右侧章节目录 (>= 1024px 显示，sticky稳固吸顶跟随滚动) */}
         <ArticleTOC
-          className="hidden lg:block lg:sticky lg:top-24 lg:w-60 xl:w-[17rem] shrink-0 self-start"
+          className="hidden lg:block sticky top-24 z-20 w-64 xl:w-72 2xl:w-80 shrink-0 self-start"
           hideWhenEmpty
         />
       </div>
