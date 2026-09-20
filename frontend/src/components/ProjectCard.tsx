@@ -13,6 +13,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { apiFetch, PUBLIC_API_URL } from "@/lib/api-fetch";
 import { toast } from "@/lib/toast";
 import { notifyContentUpdated } from "@/lib/content-sync";
+import { sharePost } from "@/lib/share";
 import ActionMenu from "./ActionMenu";
 import InteractionBubble from "./InteractionBubble";
 import CommentSection from "./CommentSection";
@@ -213,45 +214,14 @@ export default function ProjectCard({ post, index, featured = false, variant = "
   };
 
   const handleShare = async () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
     const projectPath = `/projects/${post.shortId || post.id}`;
-    const url = origin ? `${origin}${projectPath}` : projectPath;
     const shareTitle = `项目: ${title}`;
-
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({
-          title: shareTitle,
-          text: description ? description.slice(0, 80) : undefined,
-          url,
-        });
-        return;
-      } catch (err: unknown) {
-        if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
-      }
-    }
-
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success("项目链接已复制到剪贴板");
-        return;
-      } catch {}
-    }
-
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = url;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-      toast.success("项目链接已复制到剪贴板");
-    } catch {
-      prompt("请复制项目链接：", url);
-    }
+    await sharePost({
+      title: shareTitle,
+      url: projectPath,
+      typeLabel: "项目",
+      summary: description,
+    });
   };
 
   const imageCandidates = useMemo(() => {

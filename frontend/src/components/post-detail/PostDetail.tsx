@@ -16,6 +16,7 @@ import { useMusicPlayer, getStaticMusicUrl } from "@/lib/music-player-store";
 import { getGlobalAudio } from "@/lib/global-audio";
 import { useEditPost } from "@/lib/edit-post-store";
 import { toast } from "@/lib/toast";
+import { sharePost } from "@/lib/share";
 import ImageGrid from "@/components/ImageGrid";
 import VideoPlayer from "@/components/VideoPlayer";
 import InteractionBubble from "@/components/InteractionBubble";
@@ -181,10 +182,10 @@ export default function PostDetail({ post }: PostDetailProps) {
   };
 
   const handleShare = async () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const momentPath = `/moments/${post.shortId || post.id}`;
-    const url = origin ? `${origin}${momentPath}` : momentPath;
     const isCollection = post.type === "collection";
+    const path = isCollection
+      ? `/articles/${post.shortId || post.id}`
+      : `/moments/${post.shortId || post.id}`;
     const plainText = (post.title || post.excerpt || post.content || "")
       .replace(/<[^>]+>/g, "")
       .replace(/\s+/g, " ")
@@ -195,40 +196,12 @@ export default function PostDetail({ post }: PostDetailProps) {
         ? (plainText.length > 30 ? plainText.slice(0, 30) + "…" : plainText)
         : `${post.author?.nickname || "用户"} 的动态`);
 
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({
-          title,
-          text: post.excerpt || (plainText ? plainText.slice(0, 80) : undefined),
-          url,
-        });
-        return;
-      } catch (err: unknown) {
-        if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
-      }
-    }
-
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success(isCollection ? "系列合辑链接已复制到剪贴板" : "动态链接已复制到剪贴板");
-        return;
-      } catch {}
-    }
-
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = url;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-      toast.success(isCollection ? "系列合辑链接已复制到剪贴板" : "动态链接已复制到剪贴板");
-    } catch {
-      prompt(isCollection ? "请复制系列合辑链接：" : "请复制动态链接：", url);
-    }
+    await sharePost({
+      title,
+      url: path,
+      typeLabel: isCollection ? "系列合辑" : "动态",
+      summary: post.excerpt || plainText,
+    });
   };
 
   const handleMusicClick = async () => {

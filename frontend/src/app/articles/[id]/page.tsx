@@ -9,10 +9,12 @@ import Footer from "@/components/Footer";
 import DesktopFooter from "@/components/DesktopFooter";
 import EditPostModal from "@/components/EditPostModal";
 import ArticleReader from "@/components/article/ArticleReader";
+import CollectionReader from "@/components/article/CollectionReader";
 import ProfileFadeIn from "@/components/profile/ProfileFadeIn";
 import { Post } from "@/lib/mock-data";
 import { getApiUrl } from "@/lib/api-fetch";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
+import { extractCleanPostId } from "@/lib/share";
 
 const API_URL = getApiUrl();
 
@@ -39,14 +41,18 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const cleanId = extractCleanPostId(rawId);
   try {
-    const post = await getPost(id);
+    const post = await getPost(cleanId);
     if (!post) return { title: "文章详情" };
     const cleanSummary = stripMarkdownAndHtml(post.excerpt || post.content || "");
+    const title = post.type === "collection"
+      ? `《${post.title || "合辑"}》系列专栏 - 个人博客`
+      : `${post.title || "文章详情"} - 个人博客`;
     return {
-      title: `${post.title || "文章详情"} - 个人博客`,
-      description: cleanSummary.slice(0, 150) || "文章详情",
+      title,
+      description: cleanSummary.slice(0, 150) || (post.type === "collection" ? "查看系列专栏合辑详情" : "文章详情"),
     };
   } catch {
     return { title: "文章详情" };
@@ -58,18 +64,26 @@ export default async function ArticleDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const post = await getPost(id);
+  const { id: rawId } = await params;
+  const cleanId = extractCleanPostId(rawId);
+  const post = await getPost(cleanId);
   if (!post) notFound();
   if (post.status === "draft") notFound();
+
+  // 若带有多余粘连文字/标点，重定向到纯净链接
+  if (rawId !== cleanId) {
+    redirect(`/articles/${post.shortId || post.id}`);
+  }
 
   // 跨频道路由守卫 (Cross-Channel Route Guard)
   if (post.category === "项目" || post.type === "project") {
     redirect(`/projects/${post.shortId || post.id}`);
   }
-  if (post.type !== "article") {
+  if (post.type !== "article" && post.type !== "collection") {
     redirect(`/moments/${post.shortId || post.id}`);
   }
+
+  const isCollection = post.type === "collection";
 
   return (
     <div id="scroll-root" className="relative min-h-screen flex flex-col overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
@@ -85,14 +99,18 @@ export default async function ArticleDetailPage({
               className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span>返回文章列表</span>
+              <span>{isCollection ? "返回文章与专栏列表" : "返回文章列表"}</span>
             </Link>
           </div>
 
           <main className="relative flex min-h-[calc(100vh-10rem)] w-full flex-col overflow-hidden rounded-2xl sm:rounded-3xl bg-wechat-white p-4 sm:p-8 md:p-10 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] border border-neutral-200/60 dark:border-neutral-800/80">
             <ProfileFadeIn>
               <div className="flex-1">
-                <ArticleReader post={post} />
+                {isCollection ? (
+                  <CollectionReader post={post} />
+                ) : (
+                  <ArticleReader post={post} />
+                )}
               </div>
               <div className="mt-auto pt-16">
                 <Footer />

@@ -31,6 +31,7 @@ import ArticleCommentSection from "@/components/article/ArticleCommentSection";
 import ArticleEmbedContent from "@/components/article/ArticleEmbedContent";
 import MusicEmbedCard from "@/components/article/MusicEmbedCard";
 import VideoPlayer from "@/components/VideoPlayer";
+import { sharePost } from "@/lib/share";
 
 import { PUBLIC_API_URL } from "@/lib/api-fetch";
 
@@ -172,20 +173,15 @@ export default function ArticleReader({ post }: ArticleReaderProps) {
   };
 
   const handleShare = async () => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: post.title || "文章", url });
-        return;
-      } catch {}
-    }
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2500);
-      } catch {}
-    }
+    const url = typeof window !== "undefined" ? window.location.href : `/articles/${post.shortId || post.id}`;
+    await sharePost({
+      title: post.title ? `《${post.title}》` : "文章",
+      url,
+      typeLabel: "文章",
+      summary: post.excerpt,
+    });
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const handleCommentClick = () => {

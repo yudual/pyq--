@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { apiFetch, PUBLIC_API_URL } from "@/lib/api-fetch";
 import { toast } from "@/lib/toast";
 import { notifyContentUpdated } from "@/lib/content-sync";
+import { sharePost } from "@/lib/share";
 import ActionMenu from "./ActionMenu";
 import InteractionBubble from "./InteractionBubble";
 import CommentSection from "./CommentSection";
@@ -194,45 +195,14 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
   };
 
   const handleShare = async () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
     const articlePath = `/articles/${post.shortId || post.id}`;
-    const url = origin ? `${origin}${articlePath}` : articlePath;
     const title = post.title ? `《${post.title}》` : `${authorName} 的文章`;
-
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({
-          title,
-          text: excerpt ? excerpt.slice(0, 80) : undefined,
-          url,
-        });
-        return;
-      } catch (err: unknown) {
-        if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
-      }
-    }
-
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success("文章链接已复制到剪贴板");
-        return;
-      } catch {}
-    }
-
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = url;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-      toast.success("文章链接已复制到剪贴板");
-    } catch {
-      prompt("请复制文章链接：", url);
-    }
+    await sharePost({
+      title,
+      url: articlePath,
+      typeLabel: "文章",
+      summary: excerpt,
+    });
   };
 
   if (deleted) return null;

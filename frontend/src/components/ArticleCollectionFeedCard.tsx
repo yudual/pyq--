@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { apiFetch, PUBLIC_API_URL } from "@/lib/api-fetch";
 import { toast } from "@/lib/toast";
 import { notifyContentUpdated } from "@/lib/content-sync";
+import { sharePost } from "@/lib/share";
 import ActionMenu from "./ActionMenu";
 import InteractionBubble from "./InteractionBubble";
 import CommentSection from "./CommentSection";
@@ -180,49 +181,14 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
 
   // 聚合分享处理
   const handleShare = async () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const momentPath = `/moments/${post.shortId || post.id}`;
-    const url = origin ? `${origin}${momentPath}` : momentPath;
-    const plainText = (post.title || post.excerpt || "")
-      .replace(/<[^>]+>/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    const collectionPath = `/articles/${post.shortId || post.id}`;
     const title = post.title ? `《${post.title}》系列合辑` : `${authorName} 的系列合辑`;
-
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({
-          title,
-          text: post.excerpt ? post.excerpt.slice(0, 80) : undefined,
-          url,
-        });
-        return;
-      } catch (err: unknown) {
-        if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
-      }
-    }
-
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success("合辑链接已复制到剪贴板");
-        return;
-      } catch {}
-    }
-
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = url;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-      toast.success("合辑链接已复制到剪贴板");
-    } catch {
-      prompt("请复制合辑链接：", url);
-    }
+    await sharePost({
+      title,
+      url: collectionPath,
+      typeLabel: "系列合辑",
+      summary: post.excerpt,
+    });
   };
 
   if (deleted) return null;
@@ -274,15 +240,19 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
 
         {/* 系列合辑聚合卡片 */}
         <div className="mt-2.5 w-full overflow-hidden rounded-2xl border border-blue-100/90 dark:border-blue-900/40 bg-gradient-to-br from-[#f8faff] via-[#f5f8ff] to-[#edf3ff] dark:from-[#1b1e26] dark:via-[#191d27] dark:to-[#161a24] p-3.5 sm:p-4 shadow-xs transition-all duration-200 hover:shadow-md">
-          {/* 合辑头部 Banner */}
-          <div className="flex items-start gap-3 pb-3 border-b border-blue-100/70 dark:border-blue-900/30">
+          {/* 合辑头部 Banner (点击可直达合辑详情专栏) */}
+          <Link
+            href={`/articles/${post.shortId || post.id}`}
+            className="group/banner flex items-start gap-3 pb-3 border-b border-blue-100/70 dark:border-blue-900/30 hover:opacity-95 transition-opacity"
+            title="点击查看完整合辑目录与专栏详情"
+          >
             {coverUrl ? (
               <div className="relative h-16 w-16 sm:h-18 sm:w-18 shrink-0 overflow-hidden rounded-xl border border-black/5 dark:border-white/10 shadow-xs">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={coverUrl}
                   alt={post.title || ""}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover group-hover/banner:scale-102 transition-transform duration-300"
                 />
               </div>
             ) : (
@@ -297,14 +267,14 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
                 <span>·</span>
                 <span>共 {totalArticles} 篇连续更新</span>
               </div>
-              <h4 className="mt-0.5 text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100 leading-snug line-clamp-2">
+              <h4 className="mt-0.5 text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100 leading-snug line-clamp-2 group-hover/banner:text-blue-600 dark:group-hover/banner:text-blue-400 transition-colors">
                 {post.title || "精选系列文章合辑"}
               </h4>
               <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 line-clamp-1">
-                点击下列各章节即可快速跳转阅读
+                点击进入合辑详情，或从下方章节按序阅读
               </p>
             </div>
-          </div>
+          </Link>
 
           {/* 子文章章节列表 */}
           <div className="mt-3 space-y-1.5">
@@ -378,9 +348,9 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-[13px] text-wechat-time md:text-[14px]">
             <Link
-              href={`/moments/${post.shortId || post.id}`}
+              href={`/articles/${post.shortId || post.id}`}
               className="hover:underline hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
-              title="查看合辑详情与评论"
+              title="查看合辑专栏详情与讨论"
             >
               <time dateTime={post.createdAt} title={post.createdAt}>{exactDateTime}</time>
             </Link>

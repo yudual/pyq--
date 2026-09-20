@@ -5,7 +5,7 @@ import { Post, Comment, Like, CommentLike, User, SiteSetting, Media } from "../m
 import { authenticate, authenticateOptional, AuthRequest, requireAdmin } from "../middleware/auth";
 import { getClientIp } from "../utils/ip";
 import { getRegionByIp } from "../utils/region";
-import { generateShortId } from "../utils/short-id";
+import { generateShortId, extractCleanId } from "../utils/short-id";
 import { triggerRevalidate } from "../utils/revalidate";
 import { checkCommentRate, recordCommentSuccess, resetViolations } from "../middleware/rateLimit";
 import { blacklistService } from "../services/blacklist-service";
@@ -97,7 +97,7 @@ function getExcerpt(post: any): string {
 function getCanonicalPostPath(post: { shortId?: string | null; id: string; type?: string; category?: string }): string {
   const slug = post.shortId || post.id;
   if (post.category === "项目" || post.type === "project") return `/projects/${slug}`;
-  if (post.type === "article") return `/articles/${slug}`;
+  if (post.type === "article" || post.type === "collection") return `/articles/${slug}`;
   return `/moments/${slug}`;
 }
 
@@ -492,12 +492,16 @@ router.get("/search", async (req: Request, res: Response) => {
   res.json(results);
 });
 
-// GET /api/posts/:id — 支持 UUID 和 shortId 两种格式
+// GET /api/posts/:id — 支持 UUID 和 shortId 两种格式（含粘连参数容错）
 router.get("/:id", authenticateOptional, async (req: AuthRequest, res: Response) => {
-  const id = req.params.id as string;
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const rawId = String(req.params.id || "").trim();
+  const cleanId = extractCleanId(rawId);
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
 
-  const where = isUuid ? { id } : { shortId: id };
+  const where = isUuid
+    ? (rawId === cleanId ? { id: cleanId } : { [Op.or]: [{ id: rawId }, { id: cleanId }] })
+    : (rawId === cleanId ? { shortId: cleanId } : { [Op.or]: [{ shortId: rawId }, { shortId: cleanId }, { id: cleanId }] });
+
   const post = await Post.findOne({
     where,
     include: [
@@ -837,10 +841,11 @@ router.patch(
       return;
     }
 
-    const idParam = String(req.params.id || "").trim();
+    const rawParam = String(req.params.id || "").trim();
+    const idParam = extractCleanId(rawParam);
     const post = await Post.findOne({
       where: {
-        [Op.or]: [{ id: idParam }, { shortId: idParam }],
+        [Op.or]: [{ id: idParam }, { shortId: idParam }, { id: rawParam }, { shortId: rawParam }],
       },
     });
 
@@ -870,7 +875,8 @@ router.delete(
   authenticate,
   requireAdmin,
   async (req: AuthRequest, res: Response) => {
-    const idParam = String(req.params.id || "").trim();
+    const rawParam = String(req.params.id || "").trim();
+    const idParam = extractCleanId(rawParam);
     if (!idParam) {
       res.status(400).json({ message: "缺少待删除的内容 ID" });
       return;
@@ -880,7 +886,7 @@ router.delete(
       // 支持 UUID 或 shortId 查找
       const post = await Post.findOne({
         where: {
-          [Op.or]: [{ id: idParam }, { shortId: idParam }],
+          [Op.or]: [{ id: idParam }, { shortId: idParam }, { id: rawParam }, { shortId: rawParam }],
         },
       });
 

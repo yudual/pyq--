@@ -11,6 +11,7 @@ import PostDetail from "@/components/post-detail/PostDetail";
 import ProfileFadeIn from "@/components/profile/ProfileFadeIn";
 import { Post } from "@/lib/mock-data";
 import { getApiUrl } from "@/lib/api-fetch";
+import { extractCleanPostId } from "@/lib/share";
 
 const API_URL = getApiUrl();
 
@@ -70,9 +71,10 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const cleanId = extractCleanPostId(rawId);
   try {
-    const post = await getPost(id);
+    const post = await getPost(cleanId);
     if (!post) return { title: "动态详情" };
     const title = getPostTitle(post);
     const plainText = (post.title || post.excerpt || post.content || "")
@@ -114,8 +116,9 @@ export default async function PostDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const post = await getPost(id);
+  const { id: rawId } = await params;
+  const cleanId = extractCleanPostId(rawId);
+  const post = await getPost(cleanId);
   if (!post) notFound();
   if (post.status === "draft") notFound();
 
@@ -123,8 +126,13 @@ export default async function PostDetailPage({
   if (post.category === "项目" || post.type === "project") {
     redirect(`/projects/${post.shortId || post.id}`);
   }
-  if (post.type === "article") {
+  if (post.type === "article" || post.type === "collection") {
     redirect(`/articles/${post.shortId || post.id}`);
+  }
+
+  // 若带有多余粘连文字/标点，重定向到纯净动态链接
+  if (rawId !== cleanId) {
+    redirect(`/moments/${post.shortId || post.id}`);
   }
 
   return (

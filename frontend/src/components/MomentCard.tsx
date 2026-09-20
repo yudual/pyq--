@@ -23,6 +23,7 @@ import CommentSection from "./CommentSection";
 import LazyImage from "./LazyImage";
 import DoubanEmbedCard from "./article/DoubanEmbedCard";
 import { toast } from "@/lib/toast";
+import { sharePost } from "@/lib/share";
 
 import { PUBLIC_API_URL } from "@/lib/api-fetch";
 
@@ -239,9 +240,7 @@ export default function MomentCard({
   };
 
   const handleShare = async () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
     const momentPath = `/moments/${post.shortId || post.id}`;
-    const url = origin ? `${origin}${momentPath}` : momentPath;
     const plainText = (post.content || "")
       .replace(/<[^>]+>/g, "")
       .replace(/\s+/g, " ")
@@ -252,42 +251,12 @@ export default function MomentCard({
         : plainText
       : `${post.author?.nickname || "用户"} 的动态`;
 
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({
-          title,
-          text: plainText ? plainText.slice(0, 80) : undefined,
-          url,
-        });
-        return;
-      } catch (err: any) {
-        if (err?.name === "AbortError") return;
-      }
-    }
-
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success("动态链接已复制到剪贴板");
-        return;
-      } catch {
-        // clipboard writeText failed, fall through to textarea copy
-      }
-    }
-
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = url;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-      toast.success("动态链接已复制到剪贴板");
-    } catch {
-      prompt("请复制动态链接：", url);
-    }
+    await sharePost({
+      title,
+      url: momentPath,
+      typeLabel: "动态",
+      summary: plainText,
+    });
   };
 
   // 点击动态音乐卡片：后端只解析直连地址，浏览器直接从音乐源下载音频。

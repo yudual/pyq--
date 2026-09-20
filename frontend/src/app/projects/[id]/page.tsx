@@ -12,6 +12,7 @@ import { Post, formatArticleTime } from "@/lib/mock-data";
 import { getApiUrl } from "@/lib/api-fetch";
 import ArticleEmbedContent from "@/components/article/ArticleEmbedContent";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
+import { extractCleanPostId } from "@/lib/share";
 
 const API_URL = getApiUrl();
 export const revalidate = 10;
@@ -59,9 +60,10 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const cleanId = extractCleanPostId(rawId);
   try {
-    const post = await getPost(id);
+    const post = await getPost(cleanId);
     if (!post) return { title: "项目详情" };
     const plainText = toPlainText(post.content || "");
     const title = getProjectTitle(post, plainText);
@@ -80,10 +82,16 @@ export default async function ProjectDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const post = await getPost(id);
+  const { id: rawId } = await params;
+  const cleanId = extractCleanPostId(rawId);
+  const post = await getPost(cleanId);
   if (!post) notFound();
   if (post.status === "draft") notFound();
+
+  // 若带有多余粘连文字/标点，重定向到纯净链接
+  if (rawId !== cleanId) {
+    redirect(`/projects/${post.shortId || post.id}`);
+  }
 
   // 跨频道路由守卫 (Cross-Channel Route Guard)
   const isProject = post.category === "项目" || post.type === "project";
