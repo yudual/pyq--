@@ -1,13 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calendar, Eye, Clock, ArrowRight, Folder, Pin, BookOpen, Heart, MessageSquare } from "lucide-react";
-import { Post, formatExactDateTime } from "@/lib/mock-data";
-import { toAbsoluteUrl } from "@/lib/upload";
-import { useSiteSettings } from "@/lib/site-settings-store";
+import { useRouter } from "next/navigation";
+import { Calendar, Eye, Clock, ArrowRight, Folder, Pin, Heart, MessageSquare } from "lucide-react";
+import { Comment, Post, formatExactDateTime } from "@/lib/mock-data";
 import { resolveAvatar } from "@/lib/avatar";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
 import { resolveCoverImage } from "@/lib/post-image";
+import { getCurrentUser } from "@/lib/auth";
+import { apiFetch, PUBLIC_API_URL } from "@/lib/api-fetch";
+import { toast } from "@/lib/toast";
+import { notifyContentUpdated } from "@/lib/content-sync";
+import ActionMenu from "./ActionMenu";
+import InteractionBubble from "./InteractionBubble";
+import CommentSection from "./CommentSection";
+
+const API_URL = PUBLIC_API_URL;
 
 interface ArticleFeedCardProps {
   post: Post;
@@ -30,21 +39,8 @@ const ARTICLE_TYPE_BADGES: Record<string, { label: string; className: string }> 
   },
 };
 
-function formatDisplayDate(dateStr?: string): string {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  } catch {
-    return dateStr;
-  }
-}
-
 export default function ArticleFeedCard({ post, index, variant = "standalone" }: ArticleFeedCardProps) {
+  const router = useRouter();
   const detailUrl = `/articles/${post.shortId || post.id}`;
   const coverUrl = resolveCoverImage(post.cover, post.content);
 
@@ -66,6 +62,180 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
   const typeBadge = ARTICLE_TYPE_BADGES[post.articleType || "original"] || ARTICLE_TYPE_BADGES.original;
   const exactDateTime = formatExactDateTime(post.createdAt);
   const authorName = post.author?.nickname || "博主";
+
+  // 朋友圈流模式 (variant === "feed") 互动状态
+  const [likes, setLikes] = useState<Array<{ name: string; email?: string }>>(post.likes || []);
+  const [liked, setLiked] = useState(!!post.meLiked);
+  const [liking, setLiking] = useState(false);
+
+  const [comments, setComments] = useState<Comment[]>(post.comments || []);
+  const [showComments, setShowComments] = useState(false);
+  const [replyTo, setReplyTo] = useState<string | undefined>(undefined);
+
+  const [pinned, setPinned] = useState(!!post.pinned);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user?.isLoggedIn) {
+      setIsAdmin(true);
+      const sameEmail = post.author?.email && user.email && post.author.email === user.email;
+      const sameNickname = post.author?.nickname && user.nickname && post.author.nickname === user.nickname;
+      setCanEdit(!!(sameEmail || sameNickname));
+    }
+  }, [post.author?.email, post.author?.nickname]);
+
+  useEffect(() => {
+    setLiked(!!post.meLiked);
+  }, [post.id, post.meLiked]);
+
+  useEffect(() => {
+    setLikes(post.likes || []);
+  }, [post.likes]);
+
+  useEffect(() => {
+    setComments(post.comments || []);
+  }, [post.comments]);
+
+  useEffect(() => {
+    setPinned(!!post.pinned);
+  }, [post.pinned]);
+
+  // 点赞/取消赞
+  const handleLike = async () => {
+    if (liking) return;
+    setLiking(true);
+    const prevLiked = liked;
+    setLiked(!prevLiked);
+
+    const user = getCurrentUser();
+    const name = user?.nickname || (typeof window !== "undefined" && localStorage.getItem("visitor_name")) || "访客";
+    const email = user?.email || (typeof window !== "undefined" && localStorage.getItem("visitor_email")) || "";
+
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user?.isLoggedIn && user.token) {
+        headers.Authorization = `Bearer ${user.token}`;
+      }
+      const res = await fetch(`${API_URL}/posts/${post.id}/likes`, {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({ name, email }),
+      });
+      if (res.status === 403) {
+        setLiked(prevLiked);
+        const data = await res.json().catch(() => ({}));
+        if (data?.message) toast.error(data.message);
+        return;
+      }
+      if (!res.ok) {
+        setLiked(prevLiked);
+        return;
+      }
+      const data = await res.json();
+      setLiked(data.liked);
+      if (Array.isArray(data.likes)) {
+        setLikes(data.likes);
+      }
+    } catch {
+      setLiked(prevLiked);
+    } finally {
+      setLiking(false);
+    }
+  };
+
+  const handleCommentClick = () => {
+    setShowComments((prev) => !prev);
+  };
+
+  const handlePin = async () => {
+    const user = getCurrentUser();
+    if (!user?.isLoggedIn || !user.token) return;
+    const next = !pinned;
+    try {
+      const res = await fetch(`${API_URL}/posts/${post.id}/pin`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({ pinned: next }),
+      });
+      if (res.ok) {
+        setPinned(next);
+        toast.success(next ? "文章已置顶" : "已取消置顶");
+        notifyContentUpdated();
+        router.refresh();
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("确定要删除该文章吗？")) return;
+    try {
+      const res = await apiFetch(`/posts/${post.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setDeleted(true);
+        toast.success("文章已删除");
+        notifyContentUpdated();
+        router.refresh();
+      } else {
+        toast.error("删除失败，请重试");
+      }
+    } catch {
+      toast.error("网络错误，删除失败");
+    }
+  };
+
+  const handleShare = async () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const articlePath = `/articles/${post.shortId || post.id}`;
+    const url = origin ? `${origin}${articlePath}` : articlePath;
+    const title = post.title ? `《${post.title}》` : `${authorName} 的文章`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title,
+          text: excerpt ? excerpt.slice(0, 80) : undefined,
+          url,
+        });
+        return;
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
+      }
+    }
+
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("文章链接已复制到剪贴板");
+        return;
+      } catch {}
+    }
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      toast.success("文章链接已复制到剪贴板");
+    } catch {
+      prompt("请复制文章链接：", url);
+    }
+  };
+
+  if (deleted) return null;
 
   if (variant === "feed") {
     const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
@@ -102,7 +272,7 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
                   系列: {post.collection?.title || post.collectionTitle}
                 </span>
               )}
-              {post.pinned && (
+              {pinned && (
                 <span className="shrink-0 rounded-[4px] bg-[#ececec] px-2 py-0.5 text-[11px] font-medium leading-tight text-[#9a9a9a] dark:bg-white/[0.1] dark:text-[#9a9a9a]">
                   置顶
                 </span>
@@ -153,17 +323,62 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
             </div>
           </Link>
 
-          {/* Time & canonical detail action */}
+          {/* Time & actions — 朋友圈风格一致的分享评论互动 */}
           <div className="mt-2.5 flex items-center justify-between text-[13px] text-wechat-time md:text-[14px]">
-            <time dateTime={post.createdAt} title={post.createdAt}>{exactDateTime}</time>
             <Link
               href={detailUrl}
-              className="text-xs text-neutral-400 hover:text-emerald-600 dark:text-neutral-500 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+              className="hover:underline hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+              title="查看文章详情与评论"
             >
-              <span>查看文章</span>
-              <ArrowRight className="h-3 w-3" />
+              <time dateTime={post.createdAt} title={post.createdAt}>{exactDateTime}</time>
             </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href={detailUrl}
+                className="text-xs text-neutral-400 hover:text-emerald-600 dark:text-neutral-500 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+              >
+                <span>查看文章</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+              <ActionMenu
+                onLike={post.likesDisabled ? undefined : handleLike}
+                onComment={post.commentsDisabled ? undefined : handleCommentClick}
+                onShare={handleShare}
+                onEdit={canEdit || isAdmin ? () => router.push(`/admin/articles/${post.id}`) : undefined}
+                onDelete={isAdmin ? handleDelete : undefined}
+                onPin={isAdmin ? handlePin : undefined}
+                liked={liked}
+                pinned={pinned}
+              />
+            </div>
           </div>
+
+          {/* Likes + comments bubble — 朋友圈风格点赞评论气泡 */}
+          <InteractionBubble
+            likes={likes}
+            comments={comments}
+            ownerEmail={post.author?.email}
+            onReply={(commentId) => {
+              setReplyTo(commentId);
+              setShowComments(true);
+            }}
+          />
+
+          {/* Comment section — 朋友圈风格快速评论输入 */}
+          {showComments && (
+            <CommentSection
+              postId={post.id}
+              initialComments={comments}
+              initialReplyTo={replyTo}
+              onReplyCleared={() => setReplyTo(undefined)}
+              onCommentAdded={(c) => setComments((prev) => [...prev, c])}
+              onCommentSubmitted={() => {
+                setReplyTo(undefined);
+                setShowComments(false);
+              }}
+              autoFocus
+            />
+          )}
         </div>
       </article>
     );

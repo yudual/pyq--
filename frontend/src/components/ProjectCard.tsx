@@ -1,13 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight, Code2, ExternalLink, FolderGit2, Link2 } from "lucide-react";
-import { formatExactDateTime, type Post } from "@/lib/mock-data";
+import { formatExactDateTime, type Comment, type Post } from "@/lib/mock-data";
 import { getImageSrc, extractFirstMarkdownImage } from "@/lib/post-image";
 import { resolveAvatar } from "@/lib/avatar";
 import { toAbsoluteUrl, toHttps } from "@/lib/upload";
 import { useEffect, useMemo, useState } from "react";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
+import { getCurrentUser } from "@/lib/auth";
+import { apiFetch, PUBLIC_API_URL } from "@/lib/api-fetch";
+import { toast } from "@/lib/toast";
+import { notifyContentUpdated } from "@/lib/content-sync";
+import ActionMenu from "./ActionMenu";
+import InteractionBubble from "./InteractionBubble";
+import CommentSection from "./CommentSection";
+
+const API_URL = PUBLIC_API_URL;
 
 interface ProjectCardProps {
   post: Post;
@@ -66,6 +76,7 @@ function getProjectTags(post: Post, text: string) {
 }
 
 export default function ProjectCard({ post, index, featured = false, variant = "standalone" }: ProjectCardProps) {
+  const router = useRouter();
   const plainText = useMemo(() => toPlainText(post.content || ""), [post.content]);
   const title = useMemo(() => getProjectTitle(post, plainText), [plainText, post]);
   const description = useMemo(() => getProjectDescription(post, plainText), [plainText, post]);
@@ -73,6 +84,176 @@ export default function ProjectCard({ post, index, featured = false, variant = "
   const detailHref = `/projects/${post.shortId || post.id}`;
   const projectHref = post.linkCard?.url?.trim() || detailHref;
   const isExternal = projectHref.startsWith("http");
+
+  // 朋友圈模式下的互动状态
+  const [likes, setLikes] = useState<Array<{ name: string; email?: string }>>(post.likes || []);
+  const [liked, setLiked] = useState(!!post.meLiked);
+  const [liking, setLiking] = useState(false);
+  const [comments, setComments] = useState<Comment[]>(post.comments || []);
+  const [showComments, setShowComments] = useState(false);
+  const [replyTo, setReplyTo] = useState<string | undefined>(undefined);
+  const [pinned, setPinned] = useState(!!post.pinned);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user?.isLoggedIn) {
+      setIsAdmin(true);
+      const sameEmail = post.author?.email && user.email && post.author.email === user.email;
+      const sameNickname = post.author?.nickname && user.nickname && post.author.nickname === user.nickname;
+      setCanEdit(!!(sameEmail || sameNickname));
+    }
+  }, [post.author?.email, post.author?.nickname]);
+
+  useEffect(() => {
+    setLiked(!!post.meLiked);
+  }, [post.id, post.meLiked]);
+
+  useEffect(() => {
+    setLikes(post.likes || []);
+  }, [post.likes]);
+
+  useEffect(() => {
+    setComments(post.comments || []);
+  }, [post.comments]);
+
+  useEffect(() => {
+    setPinned(!!post.pinned);
+  }, [post.pinned]);
+
+  const handleLike = async () => {
+    if (liking) return;
+    setLiking(true);
+    const prevLiked = liked;
+    setLiked(!prevLiked);
+
+    const user = getCurrentUser();
+    const name = user?.nickname || (typeof window !== "undefined" && localStorage.getItem("visitor_name")) || "访客";
+    const email = user?.email || (typeof window !== "undefined" && localStorage.getItem("visitor_email")) || "";
+
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user?.isLoggedIn && user.token) {
+        headers.Authorization = `Bearer ${user.token}`;
+      }
+      const res = await fetch(`${API_URL}/posts/${post.id}/likes`, {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({ name, email }),
+      });
+      if (res.status === 403) {
+        setLiked(prevLiked);
+        const data = await res.json().catch(() => ({}));
+        if (data?.message) toast.error(data.message);
+        return;
+      }
+      if (!res.ok) {
+        setLiked(prevLiked);
+        return;
+      }
+      const data = await res.json();
+      setLiked(data.liked);
+      if (Array.isArray(data.likes)) {
+        setLikes(data.likes);
+      }
+    } catch {
+      setLiked(prevLiked);
+    } finally {
+      setLiking(false);
+    }
+  };
+
+  const handleCommentClick = () => {
+    setShowComments((prev) => !prev);
+  };
+
+  const handlePin = async () => {
+    const user = getCurrentUser();
+    if (!user?.isLoggedIn || !user.token) return;
+    const next = !pinned;
+    try {
+      const res = await fetch(`${API_URL}/posts/${post.id}/pin`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({ pinned: next }),
+      });
+      if (res.ok) {
+        setPinned(next);
+        toast.success(next ? "项目已置顶" : "已取消置顶");
+        notifyContentUpdated();
+        router.refresh();
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("确定要删除该项目动态吗？")) return;
+    try {
+      const res = await apiFetch(`/posts/${post.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setDeleted(true);
+        toast.success("项目动态已删除");
+        notifyContentUpdated();
+        router.refresh();
+      } else {
+        toast.error("删除失败，请重试");
+      }
+    } catch {
+      toast.error("网络错误，删除失败");
+    }
+  };
+
+  const handleShare = async () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const projectPath = `/projects/${post.shortId || post.id}`;
+    const url = origin ? `${origin}${projectPath}` : projectPath;
+    const shareTitle = `项目: ${title}`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: description ? description.slice(0, 80) : undefined,
+          url,
+        });
+        return;
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
+      }
+    }
+
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("项目链接已复制到剪贴板");
+        return;
+      } catch {}
+    }
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      toast.success("项目链接已复制到剪贴板");
+    } catch {
+      prompt("请复制项目链接：", url);
+    }
+  };
+
   const imageCandidates = useMemo(() => {
     const firstContentImg = extractFirstMarkdownImage(post.content);
     const values = [
@@ -100,6 +281,8 @@ export default function ProjectCard({ post, index, featured = false, variant = "
     }
     setIsFallback(true);
   };
+
+  if (deleted) return null;
 
   if (variant === "feed") {
     const authorName = post.author?.nickname || "博主";
@@ -132,7 +315,7 @@ export default function ProjectCard({ post, index, featured = false, variant = "
               <span className="rounded-full bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
                 #{post.category || "项目"}
               </span>
-              {post.pinned && (
+              {pinned && (
                 <span className="shrink-0 rounded-[4px] bg-[#ececec] px-2 py-0.5 text-[11px] font-medium leading-tight text-[#9a9a9a] dark:bg-white/[0.1] dark:text-[#9a9a9a]">
                   置顶
                 </span>
@@ -225,17 +408,62 @@ export default function ProjectCard({ post, index, featured = false, variant = "
             </div>
           </div>
 
-          {/* Time & actions */}
+          {/* Time & actions — 朋友圈流模式统一交互 */}
           <div className="mt-2.5 flex items-center justify-between text-[13px] text-wechat-time md:text-[14px]">
-            <time dateTime={post.createdAt} title={post.createdAt}>{formatExactDateTime(post.createdAt)}</time>
             <Link
               href={detailHref}
-              className="text-xs text-neutral-400 hover:text-emerald-600 dark:text-neutral-500 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+              className="hover:underline hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+              title="查看项目详情与评论"
             >
-              <span>查看项目</span>
-              <ArrowUpRight className="h-3 w-3" />
+              <time dateTime={post.createdAt} title={post.createdAt}>{formatExactDateTime(post.createdAt)}</time>
             </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href={detailHref}
+                className="text-xs text-neutral-400 hover:text-emerald-600 dark:text-neutral-500 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+              >
+                <span>查看项目</span>
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+              <ActionMenu
+                onLike={post.likesDisabled ? undefined : handleLike}
+                onComment={post.commentsDisabled ? undefined : handleCommentClick}
+                onShare={handleShare}
+                onEdit={canEdit || isAdmin ? () => router.push(`/admin/projects/${post.id}`) : undefined}
+                onDelete={isAdmin ? handleDelete : undefined}
+                onPin={isAdmin ? handlePin : undefined}
+                liked={liked}
+                pinned={pinned}
+              />
+            </div>
           </div>
+
+          {/* Likes + comments bubble */}
+          <InteractionBubble
+            likes={likes}
+            comments={comments}
+            ownerEmail={post.author?.email}
+            onReply={(commentId) => {
+              setReplyTo(commentId);
+              setShowComments(true);
+            }}
+          />
+
+          {/* Comment section */}
+          {showComments && (
+            <CommentSection
+              postId={post.id}
+              initialComments={comments}
+              initialReplyTo={replyTo}
+              onReplyCleared={() => setReplyTo(undefined)}
+              onCommentAdded={(c) => setComments((prev) => [...prev, c])}
+              onCommentSubmitted={() => {
+                setReplyTo(undefined);
+                setShowComments(false);
+              }}
+              autoFocus
+            />
+          )}
         </div>
       </article>
     );

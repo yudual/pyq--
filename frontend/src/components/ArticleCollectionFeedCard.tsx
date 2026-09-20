@@ -1,13 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { BookMarked, ChevronDown, ChevronUp, ArrowRight, Layers } from "lucide-react";
-import type { Post } from "@/lib/mock-data";
+import type { Comment, Post } from "@/lib/mock-data";
 import { formatExactDateTime } from "@/lib/mock-data";
 import { resolveAvatar } from "@/lib/avatar";
 import { resolveCoverImage } from "@/lib/post-image";
-import { useSiteSettings } from "@/lib/site-settings-store";
+import { getCurrentUser } from "@/lib/auth";
+import { apiFetch, PUBLIC_API_URL } from "@/lib/api-fetch";
+import { toast } from "@/lib/toast";
+import { notifyContentUpdated } from "@/lib/content-sync";
+import ActionMenu from "./ActionMenu";
+import InteractionBubble from "./InteractionBubble";
+import CommentSection from "./CommentSection";
+
+const API_URL = PUBLIC_API_URL;
 
 interface ArticleCollectionFeedCardProps {
   post: Post;
@@ -15,6 +24,7 @@ interface ArticleCollectionFeedCardProps {
 }
 
 export default function ArticleCollectionFeedCard({ post, index }: ArticleCollectionFeedCardProps) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const authorName = post.author?.nickname || "博主";
   const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
@@ -22,6 +32,19 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
 
   const articles = post.collectionArticles || [];
   const totalArticles = articles.length;
+
+  // 点赞与评论状态
+  const [likes, setLikes] = useState<Array<{ name: string; email?: string }>>(post.likes || []);
+  const [liked, setLiked] = useState(!!post.meLiked);
+  const [liking, setLiking] = useState(false);
+
+  const [comments, setComments] = useState<Comment[]>(post.comments || []);
+  const [showComments, setShowComments] = useState(false);
+  const [replyTo, setReplyTo] = useState<string | undefined>(undefined);
+
+  const [pinned, setPinned] = useState(!!post.pinned);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deleted, setDeleted] = useState(false);
 
   // 封面图处理（无封面即为空）
   const coverUrl = resolveCoverImage(post.cover, "");
@@ -36,6 +59,173 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
   const firstArticleUrl = articles.length > 0
     ? `/articles/${articles[0].shortId || articles[0].id}`
     : "#";
+
+  // 管理权限识别
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user?.isLoggedIn) {
+      setIsAdmin(true);
+    }
+  }, []);
+
+  // 同步外部 props
+  useEffect(() => {
+    setLiked(!!post.meLiked);
+  }, [post.id, post.meLiked]);
+
+  useEffect(() => {
+    setLikes(post.likes || []);
+  }, [post.likes]);
+
+  useEffect(() => {
+    setComments(post.comments || []);
+  }, [post.comments]);
+
+  useEffect(() => {
+    setPinned(!!post.pinned);
+  }, [post.pinned]);
+
+  // 点赞/取消赞处理
+  const handleLike = async () => {
+    if (liking) return;
+    setLiking(true);
+    const prevLiked = liked;
+    setLiked(!prevLiked);
+
+    const user = getCurrentUser();
+    const name = user?.nickname || (typeof window !== "undefined" && localStorage.getItem("visitor_name")) || "访客";
+    const email = user?.email || (typeof window !== "undefined" && localStorage.getItem("visitor_email")) || "";
+
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user?.isLoggedIn && user.token) {
+        headers.Authorization = `Bearer ${user.token}`;
+      }
+      const res = await fetch(`${API_URL}/posts/${post.id}/likes`, {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({ name, email }),
+      });
+      if (res.status === 403) {
+        setLiked(prevLiked);
+        const data = await res.json().catch(() => ({}));
+        if (data?.message) toast.error(data.message);
+        return;
+      }
+      if (!res.ok) {
+        setLiked(prevLiked);
+        return;
+      }
+      const data = await res.json();
+      setLiked(data.liked);
+      if (Array.isArray(data.likes)) {
+        setLikes(data.likes);
+      }
+    } catch {
+      setLiked(prevLiked);
+    } finally {
+      setLiking(false);
+    }
+  };
+
+  // 评论开关
+  const handleCommentClick = () => {
+    setShowComments((prev) => !prev);
+  };
+
+  // 置顶切换
+  const handlePin = async () => {
+    const user = getCurrentUser();
+    if (!user?.isLoggedIn || !user.token) return;
+    const next = !pinned;
+    try {
+      const res = await fetch(`${API_URL}/posts/${post.id}/pin`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({ pinned: next }),
+      });
+      if (res.ok) {
+        setPinned(next);
+        toast.success(next ? "合辑已置顶" : "已取消置顶");
+        notifyContentUpdated();
+        router.refresh();
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // 删除合辑（不删除包含的文章）
+  const handleDelete = async () => {
+    if (!window.confirm("确定要删除该系列合辑吗？删除合辑不会删除包含的子文章。")) return;
+    try {
+      const res = await apiFetch(`/posts/${post.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setDeleted(true);
+        toast.success("系列合辑已删除");
+        notifyContentUpdated();
+        router.refresh();
+      } else {
+        toast.error("删除失败，请重试");
+      }
+    } catch {
+      toast.error("删除失败，请重试");
+    }
+  };
+
+  // 聚合分享处理
+  const handleShare = async () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const momentPath = `/moments/${post.shortId || post.id}`;
+    const url = origin ? `${origin}${momentPath}` : momentPath;
+    const plainText = (post.title || post.excerpt || "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const title = post.title ? `《${post.title}》系列合辑` : `${authorName} 的系列合辑`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title,
+          text: post.excerpt ? post.excerpt.slice(0, 80) : undefined,
+          url,
+        });
+        return;
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
+      }
+    }
+
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("合辑链接已复制到剪贴板");
+        return;
+      } catch {}
+    }
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      toast.success("合辑链接已复制到剪贴板");
+    } catch {
+      prompt("请复制合辑链接：", url);
+    }
+  };
+
+  if (deleted) return null;
 
   return (
     <article
@@ -63,11 +253,11 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
         <h3 className="flex items-center justify-between gap-2 text-[15px] font-medium leading-5 text-wechat-nickname md:text-[16px]">
           <span className="truncate">{authorName}</span>
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 border border-blue-200/80 dark:border-blue-800/60 px-2.5 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300 shadow-sm">
+            <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 border border-blue-200/80 dark:border-blue-800/60 px-2.5 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300 shadow-xs">
               <Layers className="h-3 w-3 text-blue-600 dark:text-blue-400" />
               系列合辑 · {totalArticles} 篇
             </span>
-            {post.pinned && (
+            {pinned && (
               <span className="shrink-0 rounded-[4px] bg-[#ececec] px-2 py-0.5 text-[11px] font-medium leading-tight text-[#9a9a9a] dark:bg-white/[0.1] dark:text-[#9a9a9a]">
                 置顶
               </span>
@@ -83,11 +273,11 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
         )}
 
         {/* 系列合辑聚合卡片 */}
-        <div className="mt-2.5 w-full overflow-hidden rounded-2xl border border-blue-100/90 dark:border-blue-900/40 bg-gradient-to-br from-[#f8faff] via-[#f5f8ff] to-[#edf3ff] dark:from-[#1b1e26] dark:via-[#191d27] dark:to-[#161a24] p-3.5 sm:p-4 shadow-sm transition-all duration-200 hover:shadow-md">
+        <div className="mt-2.5 w-full overflow-hidden rounded-2xl border border-blue-100/90 dark:border-blue-900/40 bg-gradient-to-br from-[#f8faff] via-[#f5f8ff] to-[#edf3ff] dark:from-[#1b1e26] dark:via-[#191d27] dark:to-[#161a24] p-3.5 sm:p-4 shadow-xs transition-all duration-200 hover:shadow-md">
           {/* 合辑头部 Banner */}
           <div className="flex items-start gap-3 pb-3 border-b border-blue-100/70 dark:border-blue-900/30">
             {coverUrl ? (
-              <div className="relative h-16 w-16 sm:h-18 sm:w-18 shrink-0 overflow-hidden rounded-xl border border-black/5 dark:border-white/10 shadow-sm">
+              <div className="relative h-16 w-16 sm:h-18 sm:w-18 shrink-0 overflow-hidden rounded-xl border border-black/5 dark:border-white/10 shadow-xs">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={coverUrl}
@@ -125,7 +315,7 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
                 <Link
                   key={article.id}
                   href={articleUrl}
-                  className="group/item flex items-center justify-between gap-2.5 rounded-xl px-3 py-2 bg-white/70 hover:bg-white dark:bg-neutral-800/40 dark:hover:bg-neutral-800/80 border border-blue-50/80 dark:border-neutral-700/30 transition-all duration-200 hover:border-blue-200 dark:hover:border-blue-800/50 hover:shadow-sm"
+                  className="group/item flex items-center justify-between gap-2.5 rounded-xl px-3 py-2 bg-white/70 hover:bg-white dark:bg-neutral-800/40 dark:hover:bg-neutral-800/80 border border-blue-50/80 dark:border-neutral-700/30 transition-all duration-200 hover:border-blue-200 dark:hover:border-blue-800/50 hover:shadow-xs"
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-100/80 text-[11px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
@@ -156,7 +346,7 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
-              className="mt-2.5 flex w-full items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-colors"
+              className="mt-2.5 flex w-full items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
             >
               {expanded ? (
                 <>
@@ -184,13 +374,60 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
           </div>
         </div>
 
-        {/* 底部发布时间 */}
-        <div className="mt-2.5 flex items-center justify-between text-[13px] text-wechat-time md:text-[14px]">
-          <time dateTime={post.createdAt} title={post.createdAt}>{exactDateTime}</time>
-          <span className="text-xs text-neutral-400 dark:text-neutral-500">
-            系列收纳
-          </span>
+        {/* 底部发布时间与操作菜单 — 与朋友圈动态保持一致 */}
+        <div className="mt-3 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-[13px] text-wechat-time md:text-[14px]">
+            <Link
+              href={`/moments/${post.shortId || post.id}`}
+              className="hover:underline hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+              title="查看合辑详情与评论"
+            >
+              <time dateTime={post.createdAt} title={post.createdAt}>{exactDateTime}</time>
+            </Link>
+            <span className="text-[15px] leading-none text-wechat-time/60">·</span>
+            <span className="text-xs text-blue-600/80 dark:text-blue-400/80">
+              系列合辑 ({totalArticles}篇)
+            </span>
+          </div>
+
+          <ActionMenu
+            onLike={post.likesDisabled ? undefined : handleLike}
+            onComment={post.commentsDisabled ? undefined : handleCommentClick}
+            onShare={handleShare}
+            onEdit={isAdmin ? () => router.push("/admin/articles") : undefined}
+            onDelete={isAdmin ? handleDelete : undefined}
+            onPin={isAdmin ? handlePin : undefined}
+            liked={liked}
+            pinned={pinned}
+          />
         </div>
+
+        {/* Likes + comments bubble — 朋友圈风格点赞与评论气泡 */}
+        <InteractionBubble
+          likes={likes}
+          comments={comments}
+          ownerEmail={post.author?.email}
+          onReply={(commentId) => {
+            setReplyTo(commentId);
+            setShowComments(true);
+          }}
+        />
+
+        {/* Comment section — 朋友圈风格即时评论输入框 */}
+        {showComments && (
+          <CommentSection
+            postId={post.id}
+            initialComments={comments}
+            initialReplyTo={replyTo}
+            onReplyCleared={() => setReplyTo(undefined)}
+            onCommentAdded={(c) => setComments((prev) => [...prev, c])}
+            onCommentSubmitted={() => {
+              setReplyTo(undefined);
+              setShowComments(false);
+            }}
+            autoFocus
+          />
+        )}
       </div>
     </article>
   );

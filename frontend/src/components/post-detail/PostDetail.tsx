@@ -4,16 +4,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Music, Pause, Play } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Music, Pause, Play, BookMarked, Layers, ArrowRight } from "lucide-react";
 import { Post, PostMusic, formatDetailTime, getPostSourceLabel } from "@/lib/mock-data";
 import { resolveAvatar } from "@/lib/avatar";
-import { normalizeImages } from "@/lib/post-image";
-import { toAbsoluteUrl, toHttps } from "@/lib/upload";
+import { normalizeImages, resolveCoverImage } from "@/lib/post-image";
+import { toHttps } from "@/lib/upload";
 import { renderContent } from "@/lib/sanitize";
 import { getCurrentUser, authFetchHeaders } from "@/lib/auth";
 import { useMusicPlayer, getStaticMusicUrl } from "@/lib/music-player-store";
 import { getGlobalAudio } from "@/lib/global-audio";
 import { useEditPost } from "@/lib/edit-post-store";
+import { toast } from "@/lib/toast";
 import ImageGrid from "@/components/ImageGrid";
 import VideoPlayer from "@/components/VideoPlayer";
 import InteractionBubble from "@/components/InteractionBubble";
@@ -54,6 +56,7 @@ function formatMusicInfo(music: PostMusic): { title: string; subtitle?: string }
 }
 
 export default function PostDetail({ post }: PostDetailProps) {
+  const router = useRouter();
   const [likes, setLikes] = useState<Array<{ name: string; email?: string }>>(post.likes || []);
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
@@ -74,6 +77,7 @@ export default function PostDetail({ post }: PostDetailProps) {
   const isThisPlaying = isThisActive && isPlaying;
   const isThisLoading = isThisActive && isLoading;
   const normalizedImages = useMemo(() => normalizeImages(post.images), [post.images]);
+  const coverUrl = resolveCoverImage(post.cover, "");
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -86,91 +90,28 @@ export default function PostDetail({ post }: PostDetailProps) {
   }, [post.author?.email, post.author?.nickname]);
 
   // 仅在挂载时（或 post.id 变化时）根据后端返回的 meLiked 推导 liked 初始值。
-  // WP Ulike：meLiked 由后端基于 cookie visitorId/email/userId 判断，
-  // cookie 自动随请求携带，SSR 时也会准确，无需前端 localStorage 兜底。
   useEffect(() => {
     setLiked(!!post.meLiked);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id, post.meLiked]);
 
   useEffect(() => {
     setComments(post.comments || []);
   }, [post.comments]);
 
-  // 客户端首次加载：用真实 cookie/token 获取 meLiked 状态，覆盖 SSR 数据
-  // SSR 拿不到 localStorage token，初始 HTML 中 meLiked 可能不准（登录用户走 cookie visitorId 维度
-  // 但该维度点赞已被 migrateLikesToUserId 升级，导致 meLiked 错误）。
-  // 必须带 Authorization header 让后端识别登录用户，走 userId 维度查询。
   useEffect(() => {
-    const email = (typeof window !== "undefined" && localStorage.getItem("visitor_email")) || "";
-    const url = `${API_URL}/posts/${post.id}${email ? `?email=${encodeURIComponent(email)}` : ""}`;
-    fetch(url, {
-      cache: "no-store",
-      credentials: "include",
-      headers: authFetchHeaders(),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data) return;
-        if (typeof data.meLiked === "boolean") setLiked(data.meLiked);
-        if (Array.isArray(data.likes)) setLikes(data.likes);
-        if (Array.isArray(data.comments)) setComments(data.comments);
-      })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post.id]);
-
-  // 从通知/邮件链接跳转：/moments/{id}#comment-{commentId}
-  const urlNavRef = useRef(false);
-
-  // 无 hash 时重置滚动位置到顶部（避免 TopBar 遮挡）
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash.startsWith("#comment-")) {
-      window.scrollTo(0, 0);
-      const scrollRoot = document.getElementById("scroll-root");
-      if (scrollRoot) scrollRoot.scrollTop = 0;
-    }
-  }, [post.id]);
-
-  // 评论加载后滚动到 hash 指定的评论（监听 comments 变化，避免固定延迟不够的问题）
-  useEffect(() => {
-    if (urlNavRef.current) return;
-    if (comments.length === 0) return;
-    const hash = window.location.hash;
-    if (!hash.startsWith("#comment-")) return;
-    const commentId = hash.substring(9);
-    const target = comments.find((c) => c.id === commentId);
-    if (!target) return;
-
-    urlNavRef.current = true;
-    setShowComments(true);
-
-    // 等待 DOM 渲染后滚动（双 rAF 确保 React commit + paint 完成）
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        const el = document.getElementById(`comment-${commentId}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          el.style.transition = "background-color 0.3s ease";
-          el.style.backgroundColor = "rgba(128, 128, 128, 0.14)";
-          setTimeout(() => { el.style.backgroundColor = ""; }, 2500);
-        }
-        // 清除 hash 避免刷新重复触发
-        window.history.replaceState({}, "", window.location.pathname);
-      })
-    );
-  }, [comments]);
+    setLikes(post.likes || []);
+  }, [post.likes]);
 
   const handleLike = async () => {
     if (liking) return;
     setLiking(true);
-    // 乐观更新：点击瞬间翻转 UI，失败回滚
     const prevLiked = liked;
     setLiked(!prevLiked);
+
     const user = getCurrentUser();
-    const name = user?.nickname || "访客";
-    const email = user?.email || "";
+    const name = user?.nickname || (typeof window !== "undefined" && localStorage.getItem("visitor_name")) || "访客";
+    const email = user?.email || (typeof window !== "undefined" && localStorage.getItem("visitor_email")) || "";
+
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (user?.isLoggedIn && user.token) {
@@ -179,13 +120,13 @@ export default function PostDetail({ post }: PostDetailProps) {
       const res = await fetch(`${API_URL}/posts/${post.id}/likes`, {
         method: "POST",
         headers,
-        credentials: "include", // 携带 visitorId cookie
+        credentials: "include",
         body: JSON.stringify({ name, email }),
       });
       if (res.status === 403) {
         setLiked(prevLiked);
         const data = await res.json().catch(() => ({}));
-        if (data?.message) alert(data.message);
+        if (data?.message) toast.error(data.message);
         return;
       }
       if (!res.ok) {
@@ -204,6 +145,17 @@ export default function PostDetail({ post }: PostDetailProps) {
     }
   };
 
+  const handleCommentClick = () => {
+    setShowComments((prev) => {
+      if (!prev) {
+        requestAnimationFrame(() => {
+          commentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        });
+      }
+      return !prev;
+    });
+  };
+
   const handlePin = async () => {
     const user = getCurrentUser();
     if (!user?.isLoggedIn || !user.token) return;
@@ -215,21 +167,68 @@ export default function PostDetail({ post }: PostDetailProps) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${user.token}`,
         },
+        credentials: "include",
         body: JSON.stringify({ pinned: next }),
       });
-      if (res.ok) setPinned(next);
-    } catch {}
+      if (res.ok) {
+        setPinned(next);
+        toast.success(next ? "已置顶" : "已取消置顶");
+        router.refresh();
+      }
+    } catch {
+      // ignore
+    }
   };
 
-  const handleCommentClick = () => {
-    setShowComments((prev) => {
-      if (!prev) {
-        requestAnimationFrame(() => {
-          commentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  const handleShare = async () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const momentPath = `/moments/${post.shortId || post.id}`;
+    const url = origin ? `${origin}${momentPath}` : momentPath;
+    const isCollection = post.type === "collection";
+    const plainText = (post.title || post.excerpt || post.content || "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const title = post.title
+      ? (isCollection ? `《${post.title}》系列合辑` : post.title)
+      : (plainText
+        ? (plainText.length > 30 ? plainText.slice(0, 30) + "…" : plainText)
+        : `${post.author?.nickname || "用户"} 的动态`);
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title,
+          text: post.excerpt || (plainText ? plainText.slice(0, 80) : undefined),
+          url,
         });
+        return;
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
       }
-      return !prev;
-    });
+    }
+
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success(isCollection ? "系列合辑链接已复制到剪贴板" : "动态链接已复制到剪贴板");
+        return;
+      } catch {}
+    }
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      toast.success(isCollection ? "系列合辑链接已复制到剪贴板" : "动态链接已复制到剪贴板");
+    } catch {
+      prompt(isCollection ? "请复制系列合辑链接：" : "请复制动态链接：", url);
+    }
   };
 
   const handleMusicClick = async () => {
@@ -237,13 +236,19 @@ export default function PostDetail({ post }: PostDetailProps) {
     const audio = getGlobalAudio();
     if (!audio) return;
     if (isThisActive) {
-      if (audio.paused) audio.play().catch(() => {});
-      else audio.pause();
+      if (audio.paused) {
+        await audio.play();
+      } else {
+        audio.pause();
+      }
       return;
     }
+
     try {
-      const playUrl = getStaticMusicUrl(post.music);
-      if (!playUrl) throw new Error("该动态没有可播放的 R2 音频文件。");
+      const staticUrl = getStaticMusicUrl(post.music);
+      const playUrl = staticUrl;
+
+      if (!playUrl) throw new Error("该动态没有可播放的音频文件。");
       setActiveMusic(post.id, {
         postId: post.id,
         url: playUrl,
@@ -262,8 +267,9 @@ export default function PostDetail({ post }: PostDetailProps) {
 
   const displayName = post.author?.nickname || "用户";
   const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
-
   const musicInfo = post.music ? formatMusicInfo(post.music) : null;
+  const articles = post.collectionArticles || [];
+  const totalArticles = articles.length;
 
   return (
     <article id={`post-${post.id}`} className="flex gap-3 px-4 py-4 sm:px-5 md:px-6 scroll-mt-16">
@@ -287,6 +293,79 @@ export default function PostDetail({ post }: PostDetailProps) {
         <h2 className="text-[15px] font-medium leading-5 text-wechat-nickname md:text-[16px]">
           {displayName}
         </h2>
+
+        {/* 系列合辑展示 (若 post.type === "collection") */}
+        {post.type === "collection" && (
+          <div className="mt-3 w-full overflow-hidden rounded-2xl border border-blue-100/90 dark:border-blue-900/40 bg-gradient-to-br from-[#f8faff] via-[#f5f8ff] to-[#edf3ff] dark:from-[#1b1e26] dark:via-[#191d27] dark:to-[#161a24] p-4 sm:p-5 shadow-xs">
+            <div className="flex items-start gap-3.5 pb-3.5 border-b border-blue-100/70 dark:border-blue-900/30">
+              {coverUrl ? (
+                <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-xl border border-black/5 dark:border-white/10 shadow-xs">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={coverUrl} alt={post.title || ""} className="h-full w-full object-cover" />
+                </div>
+              ) : (
+                <div className="flex h-20 w-20 sm:h-24 sm:w-24 shrink-0 items-center justify-center rounded-xl bg-blue-100/70 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+                  <BookMarked className="h-10 w-10" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>系列合辑专栏</span>
+                  <span>·</span>
+                  <span>共 {totalArticles} 篇连续更新</span>
+                </div>
+                <h3 className="mt-1 text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+                  {post.title || "系列文章合辑"}
+                </h3>
+                {post.excerpt && (
+                  <p className="mt-1.5 text-xs sm:text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                    {post.excerpt}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* 子章节列表 */}
+            {articles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <div className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1">
+                  章节目录：
+                </div>
+                {articles.map((article, idx) => {
+                  const articleUrl = `/articles/${article.shortId || article.id}`;
+                  const order = String(idx + 1).padStart(2, "0");
+                  return (
+                    <Link
+                      key={article.id}
+                      href={articleUrl}
+                      className="group/item flex items-center justify-between gap-2.5 rounded-xl px-3.5 py-2.5 bg-white/80 hover:bg-white dark:bg-neutral-800/50 dark:hover:bg-neutral-800/90 border border-blue-50/80 dark:border-neutral-700/40 transition-all duration-200 hover:border-blue-200 dark:hover:border-blue-800/60 hover:shadow-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-100/80 text-[11px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                          {order}
+                        </span>
+                        <span className="truncate text-sm font-medium text-neutral-800 group-hover/item:text-blue-600 dark:text-neutral-200 dark:group-hover/item:text-blue-400 transition-colors">
+                          {article.title || "无标题文章"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 text-xs text-neutral-400 dark:text-neutral-500">
+                        {article.category && (
+                          <span className="rounded bg-neutral-100 dark:bg-neutral-700/50 px-1.5 py-0.5 text-[10px] text-neutral-600 dark:text-neutral-400">
+                            {article.category}
+                          </span>
+                        )}
+                        <span className="group-hover/item:translate-x-0.5 transition-transform text-blue-600 dark:text-blue-400 flex items-center gap-0.5 text-xs font-medium">
+                          阅读 <ArrowRight className="h-3 w-3" />
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Content text */}
         {post.content && (
@@ -412,7 +491,14 @@ export default function PostDetail({ post }: PostDetailProps) {
           <ActionMenu
             onLike={post.likesDisabled ? undefined : handleLike}
             onComment={post.commentsDisabled ? undefined : handleCommentClick}
-            onEdit={canEdit ? () => openEdit(post) : undefined}
+            onShare={handleShare}
+            onEdit={
+              canEdit
+                ? () => openEdit(post)
+                : isAdmin && post.type === "collection"
+                ? () => router.push("/admin/articles")
+                : undefined
+            }
             onPin={isAdmin ? handlePin : undefined}
             liked={liked}
             pinned={pinned}

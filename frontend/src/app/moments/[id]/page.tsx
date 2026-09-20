@@ -34,6 +34,10 @@ async function getPost(id: string): Promise<Post | null> {
 
 /** 根据动态内容生成浏览器标签标题 */
 function getPostTitle(post: Post): string {
+  // 系列合辑
+  if (post.type === "collection") {
+    return post.title ? `《${post.title}》系列合辑` : "系列合辑详情";
+  }
   // 音频：显示歌曲名
   if (post.music) {
     return post.music.name || "音乐动态";
@@ -58,7 +62,7 @@ function getPostTitle(post: Post): string {
       .trim();
     return text.length > 30 ? text.slice(0, 30) + "…" : text || "动态详情";
   }
-  return "动态详情";
+  return post.title || "动态详情";
 }
 
 export async function generateMetadata({
@@ -70,7 +74,36 @@ export async function generateMetadata({
   try {
     const post = await getPost(id);
     if (!post) return { title: "动态详情" };
-    return { title: getPostTitle(post) };
+    const title = getPostTitle(post);
+    const plainText = (post.title || post.excerpt || post.content || "")
+      .replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    const description = post.excerpt || (plainText
+      ? (plainText.length > 80 ? plainText.slice(0, 80) + "…" : plainText)
+      : "查看动态详情与讨论");
+    const firstImg = post.images?.[0];
+    const imageRaw =
+      (typeof firstImg === "string" ? firstImg : firstImg?.src) ||
+      (typeof post.music?.cover === "string" ? post.music.cover : "") ||
+      post.cover ||
+      undefined;
+    const imageUrl = imageRaw && typeof imageRaw === "string" ? imageRaw : undefined;
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        type: "article",
+        ...(imageUrl ? { images: [{ url: imageUrl }] } : {}),
+      },
+      twitter: {
+        card: imageUrl ? "summary_large_image" : "summary",
+        title,
+        description,
+        ...(imageUrl ? { images: [imageUrl] } : {}),
+      },
+    };
   } catch {
     return { title: "动态详情" };
   }

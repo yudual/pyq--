@@ -174,7 +174,7 @@ Post.init(
       defaultValue: "",
     },
     cover: {
-      type: DataTypes.STRING(512),
+      type: DataTypes.STRING(2048),
       allowNull: false,
       defaultValue: "",
     },

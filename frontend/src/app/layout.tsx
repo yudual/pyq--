@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 import LoadingBar from "@/components/LoadingBar";
+import ToastContainer from "@/components/ui/Toast";
 import EmojiFadeController from "@/components/EmojiFadeController";
 import FloatingNav from "@/components/navigation/FloatingNav";
 import { getApiUrl } from "@/lib/api-fetch";
@@ -146,6 +147,7 @@ export default async function RootLayout({
         <div id="initial-loading-bar" />
         <LoadingBar />
         <ThemeProvider>
+          <ToastContainer />
           <FloatingNav />
           {children}
           <EmojiFadeController />

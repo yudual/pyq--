@@ -57,7 +57,7 @@ router.get("/", async (_req: Request, res: Response) => {
     rssIncludeMoments: setting.rssIncludeMoments,
     doubanId: setting.doubanId,
     musicAutoplay: setting.musicAutoplay,
-    defaultCover: admin?.cover || "",
+    defaultCover: "",
   });
 });
 

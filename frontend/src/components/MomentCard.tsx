@@ -22,6 +22,7 @@ import ActionMenu from "./ActionMenu";
 import CommentSection from "./CommentSection";
 import LazyImage from "./LazyImage";
 import DoubanEmbedCard from "./article/DoubanEmbedCard";
+import { toast } from "@/lib/toast";
 
 import { PUBLIC_API_URL } from "@/lib/api-fetch";
 
@@ -237,6 +238,58 @@ export default function MomentCard({
     setShowComments((prev) => !prev);
   };
 
+  const handleShare = async () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const momentPath = `/moments/${post.shortId || post.id}`;
+    const url = origin ? `${origin}${momentPath}` : momentPath;
+    const plainText = (post.content || "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const title = plainText
+      ? plainText.length > 30
+        ? plainText.slice(0, 30) + "…"
+        : plainText
+      : `${post.author?.nickname || "用户"} 的动态`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title,
+          text: plainText ? plainText.slice(0, 80) : undefined,
+          url,
+        });
+        return;
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+      }
+    }
+
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("动态链接已复制到剪贴板");
+        return;
+      } catch {
+        // clipboard writeText failed, fall through to textarea copy
+      }
+    }
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      toast.success("动态链接已复制到剪贴板");
+    } catch {
+      prompt("请复制动态链接：", url);
+    }
+  };
+
   // 点击动态音乐卡片：后端只解析直连地址，浏览器直接从音乐源下载音频。
   const handleMusicClick = async () => {
     if (!post.music) return;
@@ -351,9 +404,15 @@ export default function MomentCard({
                   <Pin className="h-3 w-3 shrink-0 rotate-45 text-[#9a9a9a]" fill="currentColor" strokeWidth={2} />
                 )}
               </div>
-              <time className="block text-[11px] text-wechat-time" title={post.createdAt}>
-                {formatExactDateTime(post.createdAt)}
-              </time>
+              <Link
+                href={`/moments/${post.shortId || post.id}`}
+                className="inline-block hover:underline hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+                title="查看动态详情"
+              >
+                <time className="block text-[11px] text-wechat-time" title={post.createdAt}>
+                  {formatExactDateTime(post.createdAt)}
+                </time>
+              </Link>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -581,7 +640,15 @@ export default function MomentCard({
         {/* Time + action */}
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-[13px] text-wechat-time md:text-[14px]">
-            {!isCardVariant && <time title={post.createdAt}>{formatExactDateTime(post.createdAt)}</time>}
+            {!isCardVariant && (
+              <Link
+                href={`/moments/${post.shortId || post.id}`}
+                className="hover:underline hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+                title="查看动态详情"
+              >
+                <time title={post.createdAt}>{formatExactDateTime(post.createdAt)}</time>
+              </Link>
+            )}
             {(() => {
               const src = getPostSourceLabel(post);
               if (!src) return null;
@@ -596,6 +663,7 @@ export default function MomentCard({
           <ActionMenu
             onLike={post.likesDisabled ? undefined : handleLike}
             onComment={post.commentsDisabled ? undefined : handleCommentClick}
+            onShare={handleShare}
             onEdit={
               canEdit
                 ? () => {

@@ -745,7 +745,7 @@ router.put(
     body("type").optional().isIn(["moment", "article", "collection"]),
     body("title").optional({ nullable: true }).trim().isLength({ max: 200 }),
     body("excerpt").optional({ nullable: true }).trim().isLength({ max: 500 }),
-    body("cover").optional({ nullable: true }).trim().isLength({ max: 512 }),
+    body("cover").optional({ nullable: true }).trim().isLength({ max: 2048 }),
     body("category").optional({ nullable: true }).trim().isLength({ max: 50 }),
     body("articleType").optional().isIn(["original", "repost", "ai"]),
     body("repostUrl").optional().trim().isLength({ max: 500 }),
@@ -818,6 +818,49 @@ router.put(
     triggerRevalidate(Array.from(new Set([oldPath, newPath])));
 
     res.json(formatPost(post));
+  }
+);
+
+// PATCH /api/posts/:id/cover - 轻量极速修改文章或动态封面（无需提交全文，毫秒级即时生效）
+router.patch(
+  "/:id/cover",
+  authenticate,
+  requireAdmin,
+  [
+    param("id").notEmpty(),
+    body("cover").optional({ nullable: true }).trim().isLength({ max: 2048 }),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({ errors: errors.array(), message: "封面地址格式有误" });
+      return;
+    }
+
+    const idParam = String(req.params.id || "").trim();
+    const post = await Post.findOne({
+      where: {
+        [Op.or]: [{ id: idParam }, { shortId: idParam }],
+      },
+    });
+
+    if (!post) {
+      res.status(404).json({ message: "文章不存在或已被删除" });
+      return;
+    }
+
+    const newCover = req.body.cover !== undefined ? String(req.body.cover).trim() : "";
+    await post.update({ cover: newCover });
+
+    const postPath = getCanonicalPostPath(post);
+    triggerRevalidate([postPath, "/articles", "/"]);
+
+    res.json({
+      message: "封面已成功更新",
+      id: post.id,
+      shortId: post.shortId,
+      cover: post.cover,
+    });
   }
 );
 

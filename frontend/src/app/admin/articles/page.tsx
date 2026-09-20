@@ -23,6 +23,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Copy,
+  ImageIcon,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { formatArticleTime } from "@/lib/mock-data";
@@ -30,6 +31,7 @@ import { stripMarkdownAndHtml } from "@/lib/frontmatter";
 import { resolveCoverImage } from "@/lib/post-image";
 import { notifyContentUpdated } from "@/lib/content-sync";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import QuickCoverModal from "@/components/admin/QuickCoverModal";
 
 interface ArticleListItem {
   id: string;
@@ -96,6 +98,9 @@ export default function AdminArticlesPage() {
     published: 0,
     draft: 0,
   });
+
+  // 快捷封面修改弹窗目标
+  const [quickCoverTarget, setQuickCoverTarget] = useState<ArticleListItem | null>(null);
 
   // 操作轻量反馈提示
   const [bannerFeedback, setBannerFeedback] = useState<{
@@ -759,8 +764,12 @@ export default function AdminArticlesPage() {
                     )}
                   </button>
 
-                  {/* Cover */}
-                  <div className="h-32 sm:h-20 w-full sm:w-32 shrink-0 overflow-hidden rounded-lg bg-adm-input">
+                  {/* Cover (点击快捷修改封面) */}
+                  <div
+                    onClick={() => setQuickCoverTarget(article)}
+                    className="group/cover relative h-32 sm:h-20 w-full sm:w-32 shrink-0 overflow-hidden rounded-lg bg-adm-input cursor-pointer border border-transparent hover:border-adm-primary transition-all"
+                    title="点击快捷更换封面（无需进入文章编辑器）"
+                  >
                     {(() => {
                       const coverSrc = resolveCoverImage(article.cover, article.content);
                       return coverSrc ? (
@@ -768,15 +777,20 @@ export default function AdminArticlesPage() {
                         <img
                           src={coverSrc}
                           alt={article.title}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-cover transition-transform group-hover/cover:scale-105"
                           loading="lazy"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <FileText className="h-6 w-6 text-adm-text-tertiary" />
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-adm-text-tertiary">
+                          <FileText className="h-6 w-6" />
+                          <span className="text-[10px] text-adm-primary font-medium">+ 设封面</span>
                         </div>
                       );
                     })()}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white text-xs font-medium backdrop-blur-xs">
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      <span>换封面</span>
+                    </div>
                   </div>
 
                   {/* Info */}
@@ -896,6 +910,16 @@ export default function AdminArticlesPage() {
                           <span>{article.status === "draft" ? "发布" : "下架"}</span>
                         </button>
 
+                        <button
+                          type="button"
+                          onClick={() => setQuickCoverTarget(article)}
+                          className="flex items-center gap-1 rounded-lg border border-adm-border bg-adm-bg px-2.5 py-1 text-xs font-medium text-adm-text hover:bg-adm-input transition cursor-pointer"
+                          title="快捷更换/设置封面"
+                        >
+                          <ImageIcon className="h-3.5 w-3.5 text-blue-500" />
+                          <span>封面</span>
+                        </button>
+
                         <Link
                           href={`/admin/articles/${article.id}`}
                           className="flex items-center gap-1 rounded-lg bg-adm-primary px-3 py-1 text-xs font-medium text-adm-primary-text hover:opacity-90 transition cursor-pointer"
@@ -938,7 +962,7 @@ export default function AdminArticlesPage() {
                       </div>
 
                       {/* Actions on mobile */}
-                      <div className="flex sm:hidden items-center gap-1.5">
+                      <div className="flex sm:hidden items-center gap-1">
                         {isInCollection && (
                           <button
                             type="button"
@@ -948,6 +972,14 @@ export default function AdminArticlesPage() {
                             移出合辑
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => setQuickCoverTarget(article)}
+                          className="flex h-7 w-7 items-center justify-center rounded text-adm-text-secondary hover:bg-adm-input"
+                          title="快捷设置封面"
+                        >
+                          <ImageIcon className="h-3.5 w-3.5 text-blue-500" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleToggleStatus(article)}
@@ -1298,6 +1330,24 @@ export default function AdminArticlesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 快捷封面修改弹窗 */}
+      {quickCoverTarget && (
+        <QuickCoverModal
+          open={!!quickCoverTarget}
+          onClose={() => setQuickCoverTarget(null)}
+          postId={quickCoverTarget.id}
+          postTitle={quickCoverTarget.title}
+          initialCover={quickCoverTarget.cover}
+          content={quickCoverTarget.content}
+          onSuccess={(newCover) => {
+            setArticles((prev) =>
+              prev.map((a) => (a.id === quickCoverTarget.id ? { ...a, cover: newCover } : a))
+            );
+            showFeedback("success", `文章《${quickCoverTarget.title || "无标题"}》封面已更新`);
+          }}
+        />
       )}
 
       {/* 统一二次确认弹窗 */}

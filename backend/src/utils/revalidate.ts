@@ -11,7 +11,9 @@ export async function triggerRevalidate(paths?: string[]): Promise<void> {
       "http://127.0.0.1:3000"
     ).split(",")[0].trim();
     const secret = process.env.REVALIDATE_SECRET || "kanle-revalidate";
-    const mergedPaths = Array.from(new Set(["/", ...(paths || [])]));
+    const mergedPaths = Array.from(
+      new Set(["/", "/articles", "/moments", "/archives", ...(paths || [])])
+    );
     const body: Record<string, any> = {
       secret,
       paths: mergedPaths,

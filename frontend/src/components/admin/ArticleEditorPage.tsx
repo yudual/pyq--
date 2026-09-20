@@ -934,6 +934,24 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
             <span className="hidden sm:inline">存草稿</span>
           </button>
 
+          {/* 封面快捷设置按钮 */}
+          <button
+            type="button"
+            onClick={() => setShowSettingsDrawer(true)}
+            className={`relative inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+              cover
+                ? "border-emerald-500/60 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                : "border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-input hover:text-adm-text"
+            }`}
+            title="查看或设置文章封面"
+          >
+            <ImageIcon className="h-3.5 w-3.5" />
+            <span>{cover ? "已设封面" : "设置封面"}</span>
+            {cover && (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            )}
+          </button>
+
           {/* 文章设置抽屉触发按钮 */}
           <button
             type="button"
@@ -946,10 +964,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
             title="展开文章属性抽屉（封面、分类、标签、发布时间、SEO）"
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span>设置</span>
-            {cover && (
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="已设置封面" />
-            )}
+            <span>属性</span>
           </button>
 
           {/* 正式发布 / 更新发布主按钮 */}
@@ -1095,7 +1110,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
                         disabled={uploadingCover}
                         className="flex-1 rounded-lg border border-adm-border bg-adm-bg py-1.5 text-center text-xs font-medium text-adm-text hover:bg-adm-input transition cursor-pointer"
                       >
-                        {uploadingCover ? "上传中..." : "更换图片"}
+                        {uploadingCover ? "上传中..." : "更换本地图片"}
                       </button>
                       <button
                         type="button"
@@ -1104,6 +1119,17 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
                       >
                         清除
                       </button>
+                    </div>
+
+                    {/* 直接修改图片 URL */}
+                    <div className="pt-1">
+                      <input
+                        type="text"
+                        value={cover}
+                        onChange={(e) => setCover(e.target.value.trim())}
+                        placeholder="或直接粘贴图片 URL (AI生成/图床/外链)"
+                        className="w-full rounded-lg border border-adm-border bg-adm-input px-2.5 py-1.5 text-xs text-adm-text placeholder:text-adm-text-tertiary focus:outline-none focus:ring-1 focus:ring-adm-primary"
+                      />
                     </div>
                   </div>
                 ) : (
@@ -1115,6 +1141,17 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
                       <Upload className="h-5 w-5 text-adm-text-tertiary" />
                       <p className="mt-1.5 text-xs font-medium text-adm-text">点击上传封面图片</p>
                       <p className="text-[10px] text-adm-text-tertiary">支持 JPG / PNG / WebP，自动优化压缩</p>
+                    </div>
+
+                    {/* 直接粘贴图片 URL */}
+                    <div>
+                      <input
+                        type="text"
+                        value={cover}
+                        onChange={(e) => setCover(e.target.value.trim())}
+                        placeholder="或直接粘贴图片 URL (AI生成/图床/外链)"
+                        className="w-full rounded-lg border border-adm-border bg-adm-input px-2.5 py-1.5 text-xs text-adm-text placeholder:text-adm-text-tertiary focus:outline-none focus:ring-1 focus:ring-adm-primary"
+                      />
                     </div>
 
                     <div className="flex items-center gap-2">
