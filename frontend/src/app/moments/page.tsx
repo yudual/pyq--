@@ -8,7 +8,7 @@ import EditPostModal from "@/components/EditPostModal";
 import DesktopDecorations from "@/components/DesktopDecorations";
 import { MomentsLeftSidebar, MomentsRightSidebar } from "@/components/moments/MomentsSidebar";
 import { fetchOwner, fetchPostsPage, fetchSiteSettings } from "@/lib/server-data";
-import type { Post } from "@/lib/mock-data";
+import type { Post } from "@/lib/types";
 
 export const revalidate = 10;
 

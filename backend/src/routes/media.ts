@@ -110,7 +110,6 @@ router.get(
       where.kind = kind;
     }
     // 隐藏实况图的视频组件（已被合并到对应图片条目中）
-    const { Op } = require("sequelize");
     if (category && ["image", "video", "audio", "file"].includes(category) && !kind) {
       // 根据类型筛选 MIME 前缀
       const mimeMap: Record<string, string[]> = {

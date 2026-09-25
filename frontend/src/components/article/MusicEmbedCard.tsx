@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { Music, AlertCircle, Pause } from "lucide-react";
-import type { PostMusic } from "@/lib/mock-data";
+import type { PostMusic } from "@/lib/types";
 import { useMusicPlayer, getStaticMusicUrl } from "@/lib/music-player-store";
 import { getGlobalAudio } from "@/lib/global-audio";
 import { toHttps, toAbsoluteUrl } from "@/lib/upload";

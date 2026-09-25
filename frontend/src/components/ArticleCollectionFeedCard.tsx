@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BookMarked, ChevronDown, ChevronUp, ArrowRight, Layers } from "lucide-react";
-import type { Comment, Post } from "@/lib/mock-data";
-import { formatExactDateTime } from "@/lib/mock-data";
-import { resolveAvatar } from "@/lib/avatar";
+import type { Comment, Post } from "@/lib/types";
+import { formatExactDateTime } from "@/lib/time-format";
+import { resolveAvatarFromHash } from "@/lib/avatar";
 import { resolveCoverImage } from "@/lib/post-image";
 import { getCurrentUser } from "@/lib/auth";
 import { apiFetch, PUBLIC_API_URL } from "@/lib/api-fetch";
@@ -28,7 +28,7 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const authorName = post.author?.nickname || "博主";
-  const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
+  const authorAvatar = resolveAvatarFromHash(post.author?.avatar, post.author?.avatarHash, 96);
   const exactDateTime = formatExactDateTime(post.createdAt);
 
   const articles = post.collectionArticles || [];
@@ -376,7 +376,6 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
         <InteractionBubble
           likes={likes}
           comments={comments}
-          ownerEmail={post.author?.email}
           onReply={(commentId) => {
             setReplyTo(commentId);
             setShowComments(true);

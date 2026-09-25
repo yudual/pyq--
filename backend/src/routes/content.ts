@@ -11,17 +11,20 @@ import {
   User,
 } from "../models";
 import { authenticate, authenticateOptional, AuthRequest, requireAdmin } from "../middleware/auth";
-import { buildIdentity } from "./posts";
+import { buildIdentity } from "../utils/identity";
+import { loadCommentLikeStats } from "../utils/comment-like-stats";
+import { enforceCommentGuard } from "../utils/comment-guard";
 import { getClientIp } from "../utils/ip";
 import { getRegionByIp } from "../utils/region";
 import { checkCommentRate, recordCommentSuccess, resetViolations } from "../middleware/rateLimit";
 import { blacklistService } from "../services/blacklist-service";
 import { triggerRevalidate } from "../utils/revalidate";
+import { avatarHash } from "../utils/avatar-hash";
+import { resolveReplyToEmail } from "../utils/comment-utils";
 import type { CatalogCollection } from "../models/CatalogCategory";
 
 const router = Router();
 const COLLECTIONS = new Set<CatalogCollection>(["equipment", "labs"]);
-const AUTO_BAN_DURATION = 60 * 60 * 1000;
 
 function collectionFrom(value: unknown): CatalogCollection | null {
   return typeof value === "string" && COLLECTIONS.has(value as CatalogCollection)
@@ -41,10 +44,9 @@ function formatComment(comment: any, authorEmail: string, likes?: Map<string, { 
   return {
     id: comment.id,
     author: comment.authorName,
-    email: comment.email,
+    avatarHash: avatarHash(comment.email),
     website: comment.website,
     replyTo: comment.replyTo,
-    replyToEmail: comment.replyToEmail,
     replyToId: comment.replyToId,
     content: comment.content,
     createdAt: comment.createdAt,
@@ -57,29 +59,8 @@ function formatComment(comment: any, authorEmail: string, likes?: Map<string, { 
 
 async function commentLikes(comments: any[], req: AuthRequest) {
   const ids = comments.map((comment) => comment.id);
-  const result = new Map<string, { likeCount: number; meLiked: boolean }>();
-  if (!ids.length) return result;
-  const counts = await CommentLike.findAll({
-    attributes: ["commentId", [fn("COUNT", col("id")), "likeCount"]],
-    where: { commentId: { [Op.in]: ids }, status: "like" },
-    group: ["commentId"],
-    raw: true,
-  }) as any[];
-  for (const row of counts) result.set(row.commentId, { likeCount: Number(row.likeCount), meLiked: false });
   const identity = buildIdentity(req.user?.id, req.visitorId, req.user?.email || "", getClientIp(req));
-  if (identity) {
-    const mine = await CommentLike.findAll({
-      attributes: ["commentId"],
-      where: { commentId: { [Op.in]: ids }, status: "like", ...identity },
-      raw: true,
-    }) as any[];
-    for (const row of mine) {
-      const current = result.get(row.commentId) || { likeCount: 0, meLiked: false };
-      current.meLiked = true;
-      result.set(row.commentId, current);
-    }
-  }
-  return result;
+  return loadCommentLikeStats(ids, identity);
 }
 
 async function aboutPage() {
@@ -150,35 +131,30 @@ router.post(
     }
     const ip = getClientIp(req);
     const email = req.body.email as string;
-    if (await blacklistService.isAntiSpamEnabled()) {
-      const ban = await blacklistService.check(email, ip);
-      if (ban.banned) {
-        res.status(403).json({ message: "您已被限制评论" });
-        return;
-      }
-      const rate = checkCommentRate(email, ip);
-      if (!rate.allowed) {
-        if (rate.banKey) {
-          await blacklistService.add(rate.banKey.type, rate.banKey.value, "频繁刷评论自动封禁", AUTO_BAN_DURATION);
-          resetViolations(rate.banKey.type, rate.banKey.value);
-        }
-        res.status(429).json({ message: "评论太快了，请稍后再试", retryAfter: rate.retryAfter });
-        return;
-      }
+    const guard = await enforceCommentGuard(email, ip);
+    if (!guard.ok) {
+      res.status(guard.status).json(guard.body);
+      return;
     }
+    const replyToEmail = await resolveReplyToEmail({
+      replyToId: req.body.replyToId || null,
+      replyTo: req.body.replyTo || null,
+      scope: { pageId: page.id },
+      fallback: req.body.replyToEmail || null,
+    });
     const comment = await Comment.create({
       pageId: page.id,
       authorName: req.body.authorName,
       email,
       website: req.body.website || null,
       replyTo: req.body.replyTo || null,
-      replyToEmail: req.body.replyToEmail || null,
+      replyToEmail: replyToEmail ?? undefined,
       replyToId: req.body.replyToId || null,
       content: req.body.content,
       ip,
       region: await getRegionByIp(ip),
     });
-    recordCommentSuccess(email, ip);
+    if (guard.antiSpamEnabled) recordCommentSuccess(email, ip);
     res.status(201).json(formatComment(comment, String(page.author?.email || "").toLowerCase()));
   }
 );

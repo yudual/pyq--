@@ -41,10 +41,8 @@ export default async function Home() {
     <div id="scroll-root" className="relative min-h-screen flex flex-col overflow-x-clip bg-wechat-white md:bg-wechat-bg transition-colors">
       <DesktopDecorations image={homepageBg || undefined} />
 
-      {/* 1. 第一幕：典雅博主 Hero 展区 (轻盈透气，与全局背景自然融合) */}
       <HeroSection owner={owner} siteSettings={settings} />
 
-      {/* 2. 第二幕：博客动态流与长文聚合（大气宽屏画卷） */}
       <div id="moments-section" className="relative mx-auto w-full flex-1 flex flex-col max-w-4xl xl:max-w-5xl 2xl:max-w-6xl px-3 sm:px-6 lg:px-8 pt-0 sm:pt-2 pb-12 scroll-mt-20">
         <main className="relative w-full flex-1 overflow-hidden rounded-3xl bg-wechat-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] border border-neutral-200/60 dark:border-neutral-800/80">
           {/* 动态卡片顶部栏 */}

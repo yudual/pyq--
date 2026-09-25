@@ -6,8 +6,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Music, Pause, Play, BookMarked, Layers, ArrowRight } from "lucide-react";
-import { Post, PostMusic, formatDetailTime, getPostSourceLabel } from "@/lib/mock-data";
-import { resolveAvatar } from "@/lib/avatar";
+import type { Post, PostMusic } from "@/lib/types";
+import { formatDetailTime, getPostSourceLabel } from "@/lib/time-format";
+import { resolveAvatarFromHash } from "@/lib/avatar";
 import { normalizeImages, resolveCoverImage } from "@/lib/post-image";
 import { toHttps } from "@/lib/upload";
 import { renderContent } from "@/lib/sanitize";
@@ -239,7 +240,7 @@ export default function PostDetail({ post }: PostDetailProps) {
   };
 
   const displayName = post.author?.nickname || "用户";
-  const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
+  const authorAvatar = resolveAvatarFromHash(post.author?.avatar, post.author?.avatarHash, 96);
   const musicInfo = post.music ? formatMusicInfo(post.music) : null;
   const articles = post.collectionArticles || [];
   const totalArticles = articles.length;
@@ -484,7 +485,6 @@ export default function PostDetail({ post }: PostDetailProps) {
             <InteractionBubble
               likes={likes}
               comments={comments}
-              ownerEmail={post.author?.email}
               showAvatars
               onReply={(commentId) => {
                 setReplyTo(commentId);

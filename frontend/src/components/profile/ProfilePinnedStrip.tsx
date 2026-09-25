@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Play, Music2, Link as LinkIcon, ChevronRight, ChevronDown } from "lucide-react";
-import type { Post, PostImage } from "@/lib/mock-data";
+import type { Post, PostImage } from "@/lib/types";
 import { getImageSrc, normalizeImages } from "@/lib/post-image";
 import { toAbsoluteUrl, toHttps } from "@/lib/upload";
 import ImageViewer from "@/components/ImageViewer";

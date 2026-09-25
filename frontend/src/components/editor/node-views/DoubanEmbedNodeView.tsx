@@ -2,7 +2,7 @@
 
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { Film } from "lucide-react";
-import type { PostDouban } from "@/lib/mock-data";
+import type { PostDouban } from "@/lib/types";
 import { toAbsoluteUrl } from "@/lib/upload";
 import { decodePayload } from "../embed-utils";
 

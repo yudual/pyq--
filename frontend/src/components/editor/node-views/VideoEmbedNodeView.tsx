@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { Play, Video as VideoIcon, Pencil, Trash2 } from "lucide-react";
-import type { PostVideo } from "@/lib/mock-data";
+import type { PostVideo } from "@/lib/types";
 import { toAbsoluteUrl } from "@/lib/upload";
 import { decodePayload, encodePayload } from "../embed-utils";
 import { useEditorContext } from "../editor-context";

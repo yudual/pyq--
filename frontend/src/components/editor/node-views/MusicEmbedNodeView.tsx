@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { Music as MusicIcon } from "lucide-react";
-import type { PostMusic } from "@/lib/mock-data";
+import type { PostMusic } from "@/lib/types";
 import { toAbsoluteUrl } from "@/lib/upload";
 import { decodePayload, encodePayload } from "../embed-utils";
 import { useEditorContext } from "../editor-context";

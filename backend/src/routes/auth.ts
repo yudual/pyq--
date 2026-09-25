@@ -6,6 +6,7 @@ import { User, Like } from "../models";
 import { generateToken } from "../utils/jwt";
 import { getClientIp } from "../utils/ip";
 import { AuthRequest } from "../middleware/auth";
+import { checkIpRate } from "../middleware/rateLimit";
 
 const router = Router();
 
@@ -135,6 +136,12 @@ router.post(
       return;
     }
 
+    const registerRate = checkIpRate("register", getClientIp(req));
+    if (!registerRate.allowed) {
+      res.status(429).json({ message: "注册过于频繁，请稍后再试", retryAfter: registerRate.retryAfter });
+      return;
+    }
+
     const { email, password, nickname, username, avatar, cover, bio } = req.body;
 
     const existing = await User.findOne({
@@ -177,6 +184,12 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       res.status(400).json({ errors: errors.array() });
+      return;
+    }
+
+    const loginRate = checkIpRate("login", getClientIp(req));
+    if (!loginRate.allowed) {
+      res.status(429).json({ message: "尝试次数过多，请稍后再试", retryAfter: loginRate.retryAfter });
       return;
     }
 

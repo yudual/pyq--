@@ -39,7 +39,8 @@ import { syncFrontmatterToMarkdown, parseFrontmatter, type ArticleFrontmatter } 
 import { extractFirstMarkdownImage } from "@/lib/post-image";
 import { buildMusicEmbedHtml, buildLinkCardHtml, buildVideoEmbedHtml } from "@/components/editor/embed-utils";
 import { notifyContentUpdated } from "@/lib/content-sync";
-import { formatExactDateTime, toDateTimeLocal, toIsoDateString, type PostMusic, type PostVideo, type LinkCard } from "@/lib/mock-data";
+import type { LinkCard, PostMusic, PostVideo } from "@/lib/types";
+import { formatExactDateTime, toDateTimeLocal, toIsoDateString } from "@/lib/time-format";
 
 interface ArticleEditorPageProps {
   articleId?: string;

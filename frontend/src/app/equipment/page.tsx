@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import CatalogPage, { type CatalogCategory } from "@/components/CatalogPage";
 import { getApiUrl } from "@/lib/api-fetch";
 import { fetchOwner, fetchSiteSettings } from "@/lib/server-data";
-import type { User } from "@/lib/mock-data";
+import type { User } from "@/lib/types";
 
 const API_URL = getApiUrl();
 export const revalidate = 10;

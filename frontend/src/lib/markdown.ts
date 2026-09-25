@@ -342,7 +342,7 @@ export function extractHeadings(content: string): Array<{ id: string; text: stri
   const pureContent = stripFrontmatter(content).trim();
   const items: Array<{ id: string; text: string; level: number }> = [];
 
-  // 1. 优先使用 Marked 语法树提取 Markdown 标题 (h2, h3)，完美避免代码块误判
+  // 1. 优先使用 Marked 语法树提取 Markdown 标题 (h2, h3)，避免误匹配代码块内的文本
   try {
     const marked = new Marked({ gfm: true, breaks: true });
     const tokens = marked.lexer(pureContent);

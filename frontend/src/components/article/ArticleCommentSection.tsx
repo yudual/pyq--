@@ -2,8 +2,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import { flushSync } from "react-dom";
-import { Comment, Post, formatRelativeTime } from "@/lib/mock-data";
-import { cravatarUrl } from "@/lib/avatar";
+import type { Comment, Post } from "@/lib/types";
+import { formatRelativeTime } from "@/lib/time-format";
+import { cravatarUrlFromHash } from "@/lib/avatar";
 import { findParentComment, findRootCommentId } from "@/lib/comment-utils";
 import { getCurrentUser, CurrentUser } from "@/lib/auth";
 import { EMOJI_LIST, editableToShortcode, renderTextWithEmoji } from "@/lib/emoji";
@@ -283,7 +284,6 @@ export default function ArticleCommentSection({
   const submitComment = async (
     text: string,
     replyToAuthor: string | undefined,
-    replyToEmail: string,
     errorSetter: (msg: string) => void,
     replyToId?: string
   ): Promise<boolean> => {
@@ -326,7 +326,6 @@ export default function ArticleCommentSection({
           website: authorWebsite || undefined,
           content: trimmedText,
           replyTo: replyToAuthor,
-          replyToEmail: replyToEmail || undefined,
           replyToId: replyToId || undefined,
         }),
       });
@@ -374,18 +373,17 @@ export default function ArticleCommentSection({
     const text = editor ? editableToShortcode(editor) : content;
     if (!text.trim() || submitting) return;
 
-    let replyToEmail = "";
+    // 被回复者的邮箱由服务端从父评论推导，前端不再传 replyToEmail
     let replyToAuthor = "";
     if (replyTo) {
       const parent = comments.find((c) => c.id === replyTo);
       if (parent) {
-        replyToEmail = parent.email || "";
         replyToAuthor = parent.author;
       }
     }
 
     setSubmitting(true);
-    const ok = await submitComment(text, replyToAuthor || undefined, replyToEmail, setError, replyTo);
+    const ok = await submitComment(text, replyToAuthor || undefined, setError, replyTo);
     setSubmitting(false);
 
     if (ok) {
@@ -409,7 +407,6 @@ export default function ArticleCommentSection({
     const ok = await submitComment(
       text,
       targetComment.author,
-      targetComment.email || "",
       setInlineError,
       targetComment.id
     );
@@ -987,7 +984,7 @@ export default function ArticleCommentSection({
               <div key={parent.id} id={`comment-${parent.id}`} className="flex gap-3 scroll-mt-20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={cravatarUrl(parent.email || parent.author, 80)}
+                  src={cravatarUrlFromHash(parent.avatarHash, parent.author, 80)}
                   alt={parent.author}
                   className="h-10 w-10 shrink-0 rounded-lg object-cover"
                 />
@@ -1083,7 +1080,7 @@ export default function ArticleCommentSection({
                             <div key={reply.id} id={`comment-${reply.id}`} className="flex gap-2 scroll-mt-20">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={cravatarUrl(reply.email || reply.author, 80)}
+                                src={cravatarUrlFromHash(reply.avatarHash, reply.author, 80)}
                                 alt={reply.author}
                                 className="h-8 w-8 shrink-0 rounded-md object-cover"
                               />

@@ -116,6 +116,7 @@ Media.init(
     sequelize,
     tableName: "media",
     underscored: true,
+    indexes: [{ name: "idx_media_uploader_id", fields: ["uploaderId"] }],
   }
 );
 

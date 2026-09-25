@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Loader2, Save, Check, ExternalLink, RotateCcw, AlertCircle } from "lucide-react";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import { apiFetch, getToken } from "@/lib/api-fetch";
-import { defaultAboutContent } from "@/lib/mock-data";
+import { defaultAboutContent } from "@/lib/default-content";
 import { htmlToMarkdown } from "@/lib/markdown";
 
 export default function AdminAbout() {

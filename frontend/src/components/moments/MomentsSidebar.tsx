@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BookText, ExternalLink, History, Sparkles, Rss } from "lucide-react";
-import type { User, Post } from "@/lib/mock-data";
+import type { Post, User } from "@/lib/types";
 import { resolveAvatar } from "@/lib/avatar";
 import { SocialIcon, getSocialPlatform } from "@/components/SocialIcons";
 import type { CSSProperties } from "react";
@@ -29,7 +29,7 @@ export function MomentsLeftSidebar({
 }: LeftSidebarProps) {
   const avatarUrl = resolveAvatar(owner.avatar, owner.email || "", 128);
   const nickname = owner.nickname || siteSettings?.siteName || "博主";
-  const bio = owner.bio || siteSettings?.description || "记录生活中的细微光芒与日常碎碎念。";
+  const bio = owner.bio || siteSettings?.description || "记录生活与思考。";
 
   // 解析社交链接
   let socialLinks: Array<{ type: string; url: string }> = [];
@@ -109,12 +109,12 @@ export function MomentsLeftSidebar({
             <Sparkles className="h-3.5 w-3.5" />
           </div>
           <h3 className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-            日常与微光
+            说说与动态
           </h3>
         </div>
 
         <p className="text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
-          记录生活中的日常琐碎与细微光芒。支持图文、九宫格、实况图、短视频与背景音乐。
+          支持图文、九宫格、实况图、短视频与背景音乐。
         </p>
 
         {/* 常用话题标签 */}

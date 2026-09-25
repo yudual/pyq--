@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { PostMusic } from "@/lib/mock-data";
+import type { PostMusic } from "@/lib/types";
 
 export interface EditorContextValue {
   token: string;

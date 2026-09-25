@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
-import { Comment } from "@/lib/mock-data";
+import type { Comment } from "@/lib/types";
 import { cravatarUrl } from "@/lib/avatar";
 import { getCurrentUser, CurrentUser, authFetchHeaders } from "@/lib/auth";
 import { X, Smile, ChevronDown, ChevronUp } from "lucide-react";
@@ -134,13 +134,12 @@ export default function CommentSection({
       authorWebsite = website;
     }
 
-    // replyTo 现在存储的是父评论 ID，用 ID 精确查找父评论（避免同名歧义）
-    let replyToEmail = "";
+    // replyTo 现在存储的是父评论 ID，用 ID 精确查找父评论（避免同名歧义）；
+    // 被回复者的邮箱由服务端从父评论推导，前端不再传 replyToEmail
     let replyToAuthor = "";
     if (replyTo) {
       const parent = initialComments.find((c) => c.id === replyTo);
       if (parent) {
-        replyToEmail = parent.email || "";
         replyToAuthor = parent.author;
       }
     }
@@ -158,7 +157,6 @@ export default function CommentSection({
           website: authorWebsite || undefined,
           content: text,
           replyTo: replyToAuthor || undefined,
-          replyToEmail: replyToEmail || undefined,
           replyToId: replyTo || undefined,
         }),
       });

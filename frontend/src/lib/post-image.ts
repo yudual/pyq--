@@ -1,4 +1,4 @@
-import type { PostImage } from "./mock-data";
+import type { PostImage } from "./types";
 import { toAbsoluteUrl } from "./upload";
 
 export function isLivePhoto(img: PostImage): boolean {

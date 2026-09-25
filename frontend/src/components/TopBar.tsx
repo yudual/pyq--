@@ -48,7 +48,8 @@ import {
 import { cravatarUrl } from "@/lib/avatar";
 import { getGlobalAudio } from "@/lib/global-audio";
 import { useMusicPlayer } from "@/lib/music-player-store";
-import { Post, formatExactDateTime, toDateTimeLocal, toIsoDateString, type PostLocation, type PostImage, type PostVideo, type PostDouban } from "@/lib/mock-data";
+import type { Post, PostDouban, PostImage, PostLocation, PostVideo } from "@/lib/types";
+import { formatExactDateTime, toDateTimeLocal, toIsoDateString } from "@/lib/time-format";
 import { isLivePhoto, getImageSrc } from "@/lib/post-image";
 import { uploadAudio, uploadDirect, uploadImage, uploadVideo, toAbsoluteUrl, toHttps } from "@/lib/upload";
 import { PUBLIC_API_URL } from "@/lib/api-fetch";
@@ -1636,7 +1637,7 @@ export function PublishModal({
     }
     if (!isEdit && hasPublishableContent) {
       const confirmExit = window.confirm(
-        "确定退出编辑吗？\n\n- 点击「确定」：确认退出（未发表内容将被清空）\n- 点击「取消」：留在当前页面继续编辑\n\n💡 提示：若想保留内容以便后续发布，可直接点击右上角「存草稿」按钮。"
+        "确定退出编辑吗？\n\n- 点击「确定」：确认退出（未发表内容将被清空）\n- 点击「取消」：留在当前页面继续编辑\n\n提示：若想保留内容以便后续发布，可直接点击右上角「存草稿」按钮。"
       );
       if (!confirmExit) {
         return;
@@ -1835,9 +1836,8 @@ export function PublishModal({
           </div>
         )}
 
-        {/* 频道边界清晰引导 */}
         <div className="mb-3 flex items-center justify-between rounded-xl border border-dashed border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2 text-xs text-neutral-600 dark:text-neutral-400">
-          <span>💡 发布深度长文或开源项目？</span>
+          <span>发布深度长文或开源项目？</span>
           <div className="flex items-center gap-2 font-medium">
             <Link
               href="/admin/articles/new"

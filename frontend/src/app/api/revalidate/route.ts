@@ -25,10 +25,7 @@ export async function POST(request: NextRequest) {
   }
 
   const expected = process.env.REVALIDATE_SECRET;
-  const validSecrets = new Set(
-    [expected, "kanle-revalidate", "f7fb3f8826ca24262c8faaa81118defc6b2c38dc216527658561fef453105be7"].filter(Boolean)
-  );
-  if (!secret || !validSecrets.has(secret)) {
+  if (!expected || !secret || secret !== expected) {
     return NextResponse.json({ message: "Invalid secret" }, { status: 401 });
   }
 

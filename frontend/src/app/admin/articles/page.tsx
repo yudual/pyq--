@@ -26,7 +26,7 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
-import { formatArticleTime } from "@/lib/mock-data";
+import { formatArticleTime } from "@/lib/time-format";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
 import { resolveCoverImage } from "@/lib/post-image";
 import { notifyContentUpdated } from "@/lib/content-sync";

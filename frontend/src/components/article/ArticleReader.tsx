@@ -21,8 +21,9 @@ import {
   Layers,
   ArrowRight,
 } from "lucide-react";
-import { Post, formatArticleTime } from "@/lib/mock-data";
-import { resolveAvatar } from "@/lib/avatar";
+import type { Post } from "@/lib/types";
+import { formatArticleTime } from "@/lib/time-format";
+import { resolveAvatarFromHash } from "@/lib/avatar";
 import { getCurrentUser, authFetchHeaders } from "@/lib/auth";
 import { useSiteSettings } from "@/lib/site-settings-store";
 import { toAbsoluteUrl } from "@/lib/upload";
@@ -206,9 +207,9 @@ export default function ArticleReader({ post }: ArticleReaderProps) {
   };
 
   const authorName = post.author?.nickname || "博主";
-  const authorAvatar = resolveAvatar(
+  const authorAvatar = resolveAvatarFromHash(
     post.author?.avatar,
-    post.author?.email || "",
+    post.author?.avatarHash,
     80
   );
   const coverUrl = post.cover && post.cover.trim() ? toAbsoluteUrl(post.cover.trim()) : "";

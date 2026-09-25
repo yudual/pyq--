@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Trash2, Pin, PinOff, Heart, MessageSquare, ExternalLink, Plus, PenLine, Loader2 } from "lucide-react";
 import { apiFetch, getToken } from "@/lib/api-fetch";
-import { Post } from "@/lib/mock-data";
+import type { Post } from "@/lib/types";
 import PostCard from "@/components/PostCard";
 import { PostCardSkeleton } from "@/components/Skeleton";
 import { useSiteSettings } from "@/lib/site-settings-store";

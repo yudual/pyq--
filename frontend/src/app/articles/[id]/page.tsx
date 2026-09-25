@@ -11,7 +11,7 @@ import EditPostModal from "@/components/EditPostModal";
 import ArticleReader from "@/components/article/ArticleReader";
 import CollectionReader from "@/components/article/CollectionReader";
 import ProfileFadeIn from "@/components/profile/ProfileFadeIn";
-import { Post } from "@/lib/mock-data";
+import type { Post } from "@/lib/types";
 import { getApiUrl } from "@/lib/api-fetch";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
 import { extractCleanPostId } from "@/lib/share";

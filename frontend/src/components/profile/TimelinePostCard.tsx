@@ -1,7 +1,7 @@
 "use client";
 
 import ProfilePostCard from "@/components/profile/ProfilePostCard";
-import type { Post } from "@/lib/mock-data";
+import type { Post } from "@/lib/types";
 
 interface TimelinePostCardProps {
   post: Post;

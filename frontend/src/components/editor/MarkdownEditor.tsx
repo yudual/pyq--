@@ -55,7 +55,7 @@ import {
   buildDoubanEmbedHtml,
   buildLinkCardHtml,
 } from "./embed-utils";
-import type { PostMusic, PostVideo, PostDouban, LinkCard } from "@/lib/mock-data";
+import type { LinkCard, PostDouban, PostMusic, PostVideo } from "@/lib/types";
 
 export interface MarkdownEditorProps {
   value: string;

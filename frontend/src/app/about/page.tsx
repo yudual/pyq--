@@ -3,7 +3,7 @@ import { fetchOwner, fetchSiteSettings } from "@/lib/server-data";
 import { getApiUrl } from "@/lib/api-fetch";
 import AboutReader from "@/components/AboutReader";
 import SpecialPageLayout from "@/components/SpecialPageLayout";
-import type { User } from "@/lib/mock-data";
+import type { User } from "@/lib/types";
 
 export const revalidate = 10;
 

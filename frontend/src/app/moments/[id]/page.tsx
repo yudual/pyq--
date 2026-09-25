@@ -9,7 +9,7 @@ import DesktopFooter from "@/components/DesktopFooter";
 import EditPostModal from "@/components/EditPostModal";
 import PostDetail from "@/components/post-detail/PostDetail";
 import ProfileFadeIn from "@/components/profile/ProfileFadeIn";
-import { Post } from "@/lib/mock-data";
+import type { Post } from "@/lib/types";
 import { getApiUrl } from "@/lib/api-fetch";
 import { extractCleanPostId } from "@/lib/share";
 

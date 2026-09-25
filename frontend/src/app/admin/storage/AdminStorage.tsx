@@ -451,13 +451,13 @@ R2_PUBLIC_URL=https://media.example.com
           <div className="rounded-xl bg-adm-input/30 p-4">
             <h4 className="font-semibold text-adm-text">Q: 必须全部把所有图片都设置一遍吗？没设置会怎样？</h4>
             <p className="mt-1.5 leading-relaxed text-adm-text-secondary">
-              A: <strong>完全不需要！</strong> 本系统所有图片均有优雅的兜底方案：
+              A: 不需要，未设置的项会使用默认值：
               <br />
-              • 博主头像留空：自动根据管理员邮箱抓取 Cravatar 专属头像；
+              • 博主头像留空：根据管理员邮箱抓取 Cravatar 头像；
               <br />
-              • 桌面背景装饰图留空：默认展示极简优雅的光晕动效；
+              • 桌面背景装饰图留空：仅显示背景色；
               <br />
-              • 文章封面留空：自动从文章 Markdown 正文中提取第一张图片展示。按需设置即可。
+              • 文章封面留空：自动提取文章正文中的第一张图片。按需设置即可。
             </p>
           </div>
 

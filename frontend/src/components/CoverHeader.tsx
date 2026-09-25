@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { User } from "@/lib/mock-data";
+import type { User } from "@/lib/types";
 import { resolveAvatar } from "@/lib/avatar";
 import { toAbsoluteUrl } from "@/lib/upload";
 

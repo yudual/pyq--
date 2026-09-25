@@ -9,7 +9,7 @@ import {
 } from "@/lib/sanitize";
 import { isMarkdown, markdownToHtml, enhanceCodeBlocks, copyToClipboard, injectLegacyHeadingIds } from "@/lib/markdown";
 import { replaceEmojiShortcodes, normalizeInlineEmoji } from "@/lib/emoji";
-import type { PostMusic, PostVideo, PostDouban, PostImage } from "@/lib/mock-data";
+import type { PostDouban, PostImage, PostMusic, PostVideo } from "@/lib/types";
 import { toAbsoluteUrl } from "@/lib/upload";
 import MusicEmbedCard from "./MusicEmbedCard";
 import VideoPlayer from "@/components/VideoPlayer";

@@ -10,7 +10,11 @@ export async function triggerRevalidate(paths?: string[]): Promise<void> {
       process.env.FRONTEND_REVALIDATE_URL ||
       "http://127.0.0.1:3000"
     ).split(",")[0].trim();
-    const secret = process.env.REVALIDATE_SECRET || "kanle-revalidate";
+    const secret = process.env.REVALIDATE_SECRET;
+    if (!secret) {
+      console.warn("REVALIDATE_SECRET 未配置，跳过前端缓存重验证");
+      return;
+    }
     const mergedPaths = Array.from(
       new Set(["/", "/articles", "/moments", "/archives", ...(paths || [])])
     );

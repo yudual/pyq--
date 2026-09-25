@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, X, Music, Upload, ImagePlus } from "lucide-react";
-import type { PostMusic } from "@/lib/mock-data";
+import type { PostMusic } from "@/lib/types";
 import { uploadAudio, uploadImage, toAbsoluteUrl } from "@/lib/upload";
 import LyricEditor from "@/components/LyricEditor";
 import AdminModal from "./AdminModal";

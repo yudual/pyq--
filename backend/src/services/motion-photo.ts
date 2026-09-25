@@ -78,12 +78,6 @@ export function extractMotionPhoto(
   const boxStart = ftypPos - 4;
   if (boxStart < afterEoi) return null;
 
-  // 验证 box size 是否合理（不超过剩余缓冲区大小）
-  const boxSize = buf.readUInt32BE(boxStart);
-  if (boxSize < 8 || boxSize > buf.length - boxStart + 100) {
-    // box size 可能不准确（某些厂商格式），但仍尝试提取
-  }
-
   // 拆分缓冲区
   const imageBuf = buf.subarray(0, afterEoi); // 包含完整的 JPEG 数据
   const videoBuf = buf.subarray(boxStart); // 从 MP4 box 开始
@@ -99,9 +93,3 @@ export function extractMotionPhoto(
   };
 }
 
-/**
- * 检测文件是否为动态照片（包含嵌入视频）
- */
-export function isMotionPhoto(buf: Buffer): boolean {
-  return extractMotionPhoto(buf) !== null;
-}

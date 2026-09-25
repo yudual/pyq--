@@ -40,7 +40,7 @@ import { uploadImage, toAbsoluteUrl } from "@/lib/upload";
 import { markdownToHtml } from "@/lib/markdown";
 import { normalizeInlineEmoji } from "@/lib/emoji";
 import { useExitAnimation } from "@/lib/use-exit-animation";
-import type { PostMusic, PostVideo, PostDouban, LinkCard } from "@/lib/mock-data";
+import type { LinkCard, PostDouban, PostMusic, PostVideo } from "@/lib/types";
 
 // Re-export build functions for backwards compatibility (ArticleEditorPage imports these)
 export {

@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useMemo, useSyncExternalStore, type CSSProperties } from "react";
 import { Music, Pause, Pin } from "lucide-react";
-import { Post, formatExactDateTime, getPostSourceLabel } from "@/lib/mock-data";
-import { resolveAvatar } from "@/lib/avatar";
+import type { Post } from "@/lib/types";
+import { formatExactDateTime, getPostSourceLabel } from "@/lib/time-format";
+import { resolveAvatarFromHash } from "@/lib/avatar";
 import { normalizeImages } from "@/lib/post-image";
 import { toHttps } from "@/lib/upload";
 import { getCurrentUser } from "@/lib/auth";
@@ -124,7 +125,7 @@ export default function MomentCard({
   const isAdmin = !!currentUser?.isLoggedIn;
   const canEdit = !!(
     currentUser?.isLoggedIn &&
-    ((post.author?.email && currentUser.email && post.author.email === currentUser.email) ||
+    (post.author?.isOwner ||
       (post.author?.nickname && post.author.nickname === currentUser.nickname))
   );
 
@@ -333,7 +334,7 @@ export default function MomentCard({
   }, [post.id]);
 
   const displayName = post.author?.nickname || "用户";
-  const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
+  const authorAvatar = resolveAvatarFromHash(post.author?.avatar, post.author?.avatarHash, 96);
 
   return (
     <article
@@ -657,7 +658,6 @@ export default function MomentCard({
         <InteractionBubble
           likes={likes}
           comments={comments}
-          ownerEmail={post.author?.email}
           onReply={(commentId) => {
             setReplyTo(commentId);
             setShowComments(true);

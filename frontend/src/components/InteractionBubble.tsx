@@ -1,17 +1,16 @@
 import { Heart } from "lucide-react";
 import { useState } from "react";
-import { Comment, formatCommentTime } from "@/lib/mock-data";
+import type { Comment } from "@/lib/types";
+import { formatCommentTime } from "@/lib/time-format";
 import { renderTextWithEmoji } from "@/lib/emoji";
-import { cravatarUrl, actorAvatarUrl } from "@/lib/avatar";
+import { actorAvatarUrl, cravatarUrlFromHash } from "@/lib/avatar";
 
-type LikeInfo = { name: string; email?: string };
+type LikeInfo = { name: string; avatarHash?: string };
 
 interface InteractionBubbleProps {
   likes: LikeInfo[];
   comments: Comment[];
   onReply?: (commentId: string) => void;
-  /** 博主邮箱，用于识别博主评论并显示绿色点标识 */
-  ownerEmail?: string;
   /** 详情页模式：隐藏点赞文字，只渲染评论列表 */
   hideLikes?: boolean;
   /** 详情页模式：点赞和评论显示头像（微信朋友圈详情风格） */
@@ -25,7 +24,7 @@ const MAX_DISPLAY_NAMES = 5;
 const COMMENT_COLLAPSE_THRESHOLD = 5;
 
 /**
- * 兼容旧格式（string[]）和新格式（{name, email}[]）的点赞数据
+ * 兼容旧格式（string[]）和点赞对象两种数据
  */
 function normalizeLike(like: LikeInfo | string): LikeInfo {
   return typeof like === "string" ? { name: like } : like;
@@ -33,26 +32,23 @@ function normalizeLike(like: LikeInfo | string): LikeInfo {
 
 /**
  * 生成点赞去重 key：
- * - 有 email → 按 email 去重（同一人跨设备/跨名只算一次）
- * - 无 email → 按 name 去重（匿名访客同名视为同一人）
- *
- * 同名不同邮箱视为不同人，各自显示头像和计数。
+ * - 有 avatarHash（即后端有邮箱身份）→ 按其去重（同一人跨设备/跨名只算一次）
+ * - 无 → 按 name 去重（匿名访客同名视为同一人）
  */
 function likeDedupeKey(like: LikeInfo): string {
-  return like.email && like.email !== "" ? `email:${like.email}` : `name:${like.name}`;
+  return like.avatarHash ? `hash:${like.avatarHash}` : `name:${like.name}`;
 }
 
-function likeAvatarUrl(like: LikeInfo, size = 40, nameToEmail?: Map<string, string>): string {
-  if (like.email) return cravatarUrl(like.email, size);
-  // 点赞记录无 email 时，尝试从评论列表同名者补充 email
-  const mappedEmail = nameToEmail?.get(like.name);
-  if (mappedEmail) return cravatarUrl(mappedEmail, size);
+function likeAvatarUrl(like: LikeInfo, size = 40, nameToHash?: Map<string, string>): string {
+  if (like.avatarHash) return cravatarUrlFromHash(like.avatarHash, "", size);
+  // 点赞记录无 hash 时，尝试从评论列表同名者补充
+  const mappedHash = nameToHash?.get(like.name);
+  if (mappedHash) return cravatarUrlFromHash(mappedHash, "", size);
   return actorAvatarUrl("", like.name, size);
 }
 
 function commentAvatarUrl(comment: Comment, size = 56): string {
-  if (comment.email) return cravatarUrl(comment.email, size);
-  return actorAvatarUrl("", comment.author, size);
+  return cravatarUrlFromHash(comment.avatarHash, comment.author, size);
 }
 
 /**
@@ -115,16 +111,16 @@ export default function InteractionBubble({
 
   if (likes.length === 0 && comments.length === 0) return null;
 
-  // 从评论列表构建 name → email 映射，用于补充无 email 点赞的头像
-  const nameToEmail = new Map<string, string>();
+  // 从评论列表构建 name → avatarHash 映射，用于补充无 hash 点赞的头像
+  const nameToHash = new Map<string, string>();
   for (const c of comments) {
-    if (c.email && c.author && !nameToEmail.has(c.author)) {
-      nameToEmail.set(c.author, c.email);
+    if (c.avatarHash && c.author && !nameToHash.has(c.author)) {
+      nameToHash.set(c.author, c.avatarHash);
     }
   }
 
   const normalizedLikes = likes.map(normalizeLike);
-  // 详情页模式下，对命名用户按 (email || name) 去重——同名不同邮箱视为不同人，
+  // 详情页模式下，对命名用户按 (avatarHash || name) 去重——同名不同邮箱视为不同人，
   // 各自显示头像。匿名访客（"访客"/"游客"）不去重，每条独立显示。
   // 这样详情页头像总数 = formatLikes 计算的 total（命名用户去重数 + 全部访客数），保持一致。
   const displayLikes = showAvatars
@@ -162,7 +158,7 @@ export default function InteractionBubble({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={`${like.name}-${i}`}
-                src={likeAvatarUrl(like, 48, nameToEmail)}
+                src={likeAvatarUrl(like, 48, nameToHash)}
                 alt={like.name}
                 className="h-[24px] w-[24px] shrink-0 rounded-[4px] object-cover bg-black/5 dark:bg-white/10"
               />

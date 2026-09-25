@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Play } from "lucide-react";
-import type { PostVideo } from "@/lib/mock-data";
+import type { PostVideo } from "@/lib/types";
 import { toAbsoluteUrl } from "@/lib/upload";
 import VideoPlayerModal from "./VideoPlayerModal";
 import CustomVideoPlayer from "./CustomVideoPlayer";

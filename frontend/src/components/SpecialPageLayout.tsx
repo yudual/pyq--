@@ -8,7 +8,7 @@ import FloatingActions from "@/components/FloatingActions";
 import Footer from "@/components/Footer";
 import ProfileFadeIn from "@/components/profile/ProfileFadeIn";
 import ArticleTOC from "@/components/ArticleTOC";
-import type { User } from "@/lib/mock-data";
+import type { User } from "@/lib/types";
 
 interface SpecialPageLayoutProps {
   owner: User;

@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo } from "react";
 import ArticleCommentSection from "@/components/article/ArticleCommentSection";
 import ArticleEmbedContent from "@/components/article/ArticleEmbedContent";
 import AboutSocialSection, { type SocialLinkItem } from "@/components/AboutSocialSection";
-import type { Comment, User } from "@/lib/mock-data";
+import type { Comment, User } from "@/lib/types";
 
 interface AboutReaderProps {
   page: {

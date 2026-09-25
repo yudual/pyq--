@@ -31,19 +31,18 @@ interface ProjectEditorPageProps {
 
 const DEFAULT_MARKDOWN_TEMPLATE = `# 项目名称
 
-这里是一句话简介，介绍这个项目是做什么的，解决什么痛点。
+一句话介绍这个项目是做什么的。
 
-- **在线演示**：https://your-demo.com
+- **在线演示**：https://example.com
 - **开源仓库**：https://github.com/username/project
-- **核心技术**：Next.js, React, Tailwind CSS, TypeScript
+- **核心技术**：Next.js, React, TypeScript
 
 ## 核心特性
-- ✨ 特性一：极简体验，开箱即用
-- 🚀 特性二：高性能轻量化设计
-- 📱 特性三：完美支持移动端与暗黑模式
+- 特性一
+- 特性二
 
-## 项目架构与说明
-可以在这里详细写写架构选型、设计理念，或者直接贴项目截图：
+## 项目说明
+架构选型、设计思路，或贴一张项目截图：
 ![项目预览图](https://picsum.photos/seed/projectpreview/1200/600)
 `;
 
@@ -545,7 +544,7 @@ export default function ProjectEditorPage({ projectId }: ProjectEditorPageProps)
             </div>
 
             <div className="rounded-xl border border-adm-border/60 bg-adm-bg/40 p-3 text-[11px] text-adm-text-tertiary space-y-1">
-              <p className="font-medium text-adm-text-secondary">💡 关于项目卡片与详情页：</p>
+              <p className="font-medium text-adm-text-secondary">关于项目卡片与详情页：</p>
               <p>• 封面仅在前台 <span className="font-mono text-emerald-600 dark:text-emerald-400">/projects</span> 列表卡片作为视觉预览展示。</p>
               <p>• 正式项目介绍页面将直接呈现下方的 Markdown 正文，纯粹专业无多余大图干扰。</p>
             </div>

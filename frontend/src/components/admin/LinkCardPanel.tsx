@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Link2 } from "lucide-react";
-import type { LinkCard } from "@/lib/mock-data";
+import type { LinkCard } from "@/lib/types";
 import { toAbsoluteUrl } from "@/lib/upload";
 import AdminModal from "./AdminModal";
 

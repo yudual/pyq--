@@ -4,10 +4,8 @@ import { useEffect, useMemo } from "react";
 import { useSiteSettings } from "@/lib/site-settings-store";
 
 /**
- * 全局底部：版权与备案信息优雅平铺展示
- * 自动识别多行（<br> 分隔）与单行模式：
- * - 多行时第一行显示版权与感谢开源，第二行显示公安备案与工信部 ICP 备案，居中平铺
- * - 单行时自适应水平展开，避免折行乱码与错位
+ * 全局底部：版权与备案信息。
+ * footerHtml 按 <br> 分隔：第一行为版权行，其余合并为备案/附注行；单行时不分行。
  */
 export default function Footer({ className = "" }: { className?: string } = {}) {
   const beian = useSiteSettings((s) => s.beian);

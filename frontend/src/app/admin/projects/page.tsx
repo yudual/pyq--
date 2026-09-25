@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { toAbsoluteUrl } from "@/lib/upload";
-import { formatArticleTime } from "@/lib/mock-data";
+import { formatArticleTime } from "@/lib/time-format";
 import { notifyContentUpdated } from "@/lib/content-sync";
 
 interface ProjectListItem {

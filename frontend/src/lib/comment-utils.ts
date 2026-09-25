@@ -1,4 +1,4 @@
-import { Comment } from "./mock-data";
+import type { Comment } from "./types";
 
 /**
  * 在评论列表中查找指定评论的父评论（被回复的目标）。

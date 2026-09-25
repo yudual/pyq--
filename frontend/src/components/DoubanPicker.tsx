@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { Film, Book, Music, Search, Star, X } from "lucide-react";
-import type { PostDouban } from "@/lib/mock-data";
+import type { PostDouban } from "@/lib/types";
 import { getApiUrl } from "@/lib/api-fetch";
 import { toAbsoluteUrl } from "@/lib/upload";
 import { useExitAnimation } from "@/lib/use-exit-animation";

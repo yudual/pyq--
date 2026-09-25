@@ -265,11 +265,5 @@ router.delete("/admin/tracks/:id", authenticate, requireAdmin, async (req: AuthR
   res.status(204).send();
 });
 
-export async function isMediaUsedByPlaylist(mediaId: string) {
-  return MusicTrack.findOne({
-    where: { [Op.or]: [{ audioMediaId: mediaId }, { coverMediaId: mediaId }, { lyricMediaId: mediaId }] },
-    attributes: ["id"],
-  });
-}
 
 export default router;

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PostCardSkeleton } from "@/components/Skeleton";
 import { groupByTime } from "@/lib/time-group";
 import { authFetchHeaders } from "@/lib/auth";
-import type { Post } from "@/lib/mock-data";
+import type { Post } from "@/lib/types";
 import ProfilePinnedStrip from "./ProfilePinnedStrip";
 import TimelinePostCard from "./TimelinePostCard";
 

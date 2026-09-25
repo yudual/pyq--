@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Calendar, Eye, Clock, ArrowRight, Folder, Pin, Heart, MessageSquare } from "lucide-react";
-import { Comment, Post, formatExactDateTime } from "@/lib/mock-data";
-import { resolveAvatar } from "@/lib/avatar";
+import type { Comment, Post } from "@/lib/types";
+import { formatExactDateTime } from "@/lib/time-format";
+import { resolveAvatarFromHash } from "@/lib/avatar";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
 import { resolveCoverImage } from "@/lib/post-image";
 import { getCurrentUser } from "@/lib/auth";
@@ -82,11 +83,11 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
     const user = getCurrentUser();
     if (user?.isLoggedIn) {
       setIsAdmin(true);
-      const sameEmail = post.author?.email && user.email && post.author.email === user.email;
+      const sameOwner = post.author?.isOwner === true;
       const sameNickname = post.author?.nickname && user.nickname && post.author.nickname === user.nickname;
-      setCanEdit(!!(sameEmail || sameNickname));
+      setCanEdit(!!(sameOwner || sameNickname));
     }
-  }, [post.author?.email, post.author?.nickname]);
+  }, [post.author?.isOwner, post.author?.nickname]);
 
   useEffect(() => {
     setLiked(!!post.meLiked);
@@ -208,7 +209,7 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
   if (deleted) return null;
 
   if (variant === "feed") {
-    const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
+    const authorAvatar = resolveAvatarFromHash(post.author?.avatar, post.author?.avatarHash, 96);
     return (
       <article
         id={`post-${post.id}`}
@@ -327,7 +328,6 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
           <InteractionBubble
             likes={likes}
             comments={comments}
-            ownerEmail={post.author?.email}
             onReply={(commentId) => {
               setReplyTo(commentId);
               setShowComments(true);

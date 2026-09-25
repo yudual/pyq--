@@ -12,16 +12,7 @@ export function generateShortId(length = 8): string {
   return result;
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHORT_ID_REGEX = /^[0-9A-Za-z]{8}$/;
-
-export function isUUID(value: string): boolean {
-  return UUID_REGEX.test(value);
-}
-
-export function isShortId(value: string): boolean {
-  return SHORT_ID_REGEX.test(value);
-}
 
 /**
  * 从可能粘连了文本/标点的原始参数中提取纯净的 UUID 或 shortId

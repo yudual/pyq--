@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
-import { User } from "@/lib/mock-data";
+import type { User } from "@/lib/types";
 import { resolveAvatar } from "@/lib/avatar";
 import { toAbsoluteUrl, toHttps } from "@/lib/upload";
 import { SocialIcon, getSocialPlatform } from "@/components/SocialIcons";
@@ -26,7 +26,7 @@ interface HeroSectionProps {
 export default function HeroSection({ owner, siteSettings }: HeroSectionProps) {
   const avatarUrl = resolveAvatar(owner.avatar, owner.email || "", 256);
   const nickname = owner.nickname || siteSettings?.siteName || "Dual";
-  const bio = owner.bio || siteSettings?.description || "记录生活中的细微光芒，也记录每一次思考与探索。";
+  const bio = owner.bio || siteSettings?.description || "记录生活与思考。";
 
   // 从 siteSettings.backgroundImages 或 owner.cover 解析主页封面与随机背景
   const coverUrls = useMemo(() => {
@@ -120,7 +120,7 @@ export default function HeroSection({ owner, siteSettings }: HeroSectionProps) {
 
   return (
     <section className="relative flex min-h-[50vh] sm:min-h-[56vh] lg:min-h-[60vh] w-full flex-col items-center justify-center overflow-hidden px-6 pt-24 sm:pt-28 pb-10 sm:pb-14">
-      {/* 自定义主页背景封面：移动端展示自适应封面，桌面端由全局单层壁纸 DesktopDecorations 统一定位，彻底解决两张背景因滚动层级不同产生的重影错位 */}
+      {/* 移动端展示封面背景；桌面端由全局壁纸 DesktopDecorations 统一定位，避免双层背景重影 */}
       {activeCover && (
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden md:hidden [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -129,12 +129,10 @@ export default function HeroSection({ owner, siteSettings }: HeroSectionProps) {
             alt="Hero Background"
             className="h-full w-full object-cover opacity-25 dark:opacity-15 blur-[1.5px] scale-105 transition-opacity duration-1000"
           />
-          {/* 上层柔和渐变遮罩，向下自然融进透明底色，绝不形成硬切白边 */}
           <div className="absolute inset-0 bg-gradient-to-b from-white/50 via-white/20 to-transparent dark:from-neutral-950/50 dark:via-neutral-950/20 dark:to-transparent" />
         </div>
       )}
 
-      {/* 极简柔和呼吸微光背景 (Glow Accent) */}
       <div
         className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-[380px] w-[380px] sm:h-[500px] sm:w-[500px] rounded-full bg-gradient-to-tr from-sky-400/10 via-indigo-500/15 to-purple-500/10 dark:from-sky-500/10 dark:via-purple-600/15 dark:to-pink-500/10 blur-[100px] animate-hero-glow"
         aria-hidden="true"
@@ -163,7 +161,6 @@ export default function HeroSection({ owner, siteSettings }: HeroSectionProps) {
           {nickname}
         </h1>
 
-        {/* 个性标语 / 身份宣言 */}
         <p className="mt-4 text-base sm:text-lg text-neutral-500 dark:text-neutral-400 font-normal leading-relaxed max-w-xl transition-colors">
           {bio}
         </p>

@@ -16,8 +16,9 @@ import {
   Clock,
   Sparkles,
 } from "lucide-react";
-import { Post, formatArticleTime } from "@/lib/mock-data";
-import { resolveAvatar } from "@/lib/avatar";
+import type { Post } from "@/lib/types";
+import { formatArticleTime } from "@/lib/time-format";
+import { resolveAvatarFromHash } from "@/lib/avatar";
 import { resolveCoverImage } from "@/lib/post-image";
 import { getCurrentUser } from "@/lib/auth";
 import { sharePost } from "@/lib/share";
@@ -47,7 +48,7 @@ export default function CollectionReader({ post }: CollectionReaderProps) {
     : "#";
 
   const authorName = post.author?.nickname || "博主";
-  const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
+  const authorAvatar = resolveAvatarFromHash(post.author?.avatar, post.author?.avatarHash, 96);
   const formattedDate = formatArticleTime(post.createdAt);
 
   useEffect(() => {

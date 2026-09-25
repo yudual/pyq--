@@ -1,5 +1,5 @@
 import { toAbsoluteUrl } from "@/lib/upload";
-import type { LinkCard, PostMusic, PostVideo, PostDouban } from "@/lib/mock-data";
+import type { LinkCard, PostDouban, PostMusic, PostVideo } from "@/lib/types";
 
 export interface ArticleEmbedData {
   id: string;

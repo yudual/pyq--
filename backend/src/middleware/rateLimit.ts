@@ -159,3 +159,41 @@ export function resetViolations(type: "email" | "ip", value: string): void {
   if (type === "email") emailViolations.reset(normalizeEmail(value));
   else ipViolations.reset(normalizeIp(value));
 }
+
+/** 认证接口限流参数：登录 15 分钟内每 IP 最多 10 次；注册每小时每 IP 最多 5 次 */
+export const AUTH_LOGIN_IP_LIMIT = 10;
+export const AUTH_LOGIN_IP_WINDOW = 15 * 60 * 1000;
+export const AUTH_REGISTER_IP_LIMIT = 5;
+export const AUTH_REGISTER_IP_WINDOW = 60 * 60 * 1000;
+
+/** 视频重解析限流：10 分钟内每 IP 最多 30 次（正常播放只在链接过期时触发） */
+export const VIDEO_REFRESH_IP_LIMIT = 30;
+export const VIDEO_REFRESH_IP_WINDOW = 10 * 60 * 1000;
+
+const authLoginWindow = new SlidingWindow();
+const authRegisterWindow = new SlidingWindow();
+const videoRefreshWindow = new SlidingWindow();
+
+const IP_RATE_RULES = {
+  login: { window: authLoginWindow, limit: AUTH_LOGIN_IP_LIMIT, windowMs: AUTH_LOGIN_IP_WINDOW },
+  register: { window: authRegisterWindow, limit: AUTH_REGISTER_IP_LIMIT, windowMs: AUTH_REGISTER_IP_WINDOW },
+  "video-refresh": { window: videoRefreshWindow, limit: VIDEO_REFRESH_IP_LIMIT, windowMs: VIDEO_REFRESH_IP_WINDOW },
+} as const;
+
+export type IpRateKind = keyof typeof IP_RATE_RULES;
+
+/**
+ * 按 IP 限流（登录/注册防暴力破解；视频重解析防第三方接口被刷）。
+ * 请求进入即记录；失败重试由窗口自然过期恢复。
+ */
+export function checkIpRate(kind: IpRateKind, rawIp: string): { allowed: boolean; retryAfter?: number } {
+  const ip = normalizeIp(rawIp);
+  const { window, limit, windowMs } = IP_RATE_RULES[kind];
+  if (window.count(ip, windowMs) >= limit) {
+    const oldest = window.oldest(ip, windowMs);
+    const retryAfterMs = oldest > 0 ? windowMs - (Date.now() - oldest) : windowMs;
+    return { allowed: false, retryAfter: Math.max(1, Math.ceil(retryAfterMs / 1000)) };
+  }
+  window.record(ip);
+  return { allowed: true };
+}

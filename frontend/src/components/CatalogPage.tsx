@@ -1,4 +1,4 @@
-import type { User } from "@/lib/mock-data";
+import type { User } from "@/lib/types";
 import { toAbsoluteUrl } from "@/lib/upload";
 import SpecialPageLayout from "@/components/SpecialPageLayout";
 

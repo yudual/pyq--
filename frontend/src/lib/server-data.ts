@@ -1,4 +1,4 @@
-import type { Post, User } from "@/lib/mock-data";
+import type { Post, User } from "@/lib/types";
 import { getApiUrl } from "@/lib/api-fetch";
 
 /**

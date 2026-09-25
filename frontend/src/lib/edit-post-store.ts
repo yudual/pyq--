@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Post } from "./mock-data";
+import type { Post } from "./types";
 
 interface EditPostState {
   /** 正在编辑的动态；为 null 时编辑弹窗关闭 */

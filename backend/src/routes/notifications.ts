@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
-import jwt from "jsonwebtoken";
 import { Post, Comment, Like, User } from "../models";
+import { verifyToken } from "../utils/jwt";
 
 const router = Router();
 
@@ -8,7 +8,8 @@ interface NotificationItem {
   id: string;
   type: "like" | "comment" | "reply";
   actor: string;
-  actorEmail: string;
+  /** 仅博主分支下发（管理端头像用）；访客分支不下发明文邮箱 */
+  actorEmail?: string;
   content: string;
   postPreview: string;
   postType: "music" | "image" | "link" | "text" | "video";
@@ -80,8 +81,7 @@ router.get("/", async (req: Request, res: Response) => {
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
 
     if (token) {
-      const secret = process.env.JWT_SECRET || "kanle-secret";
-      const decoded = jwt.verify(token, secret) as { id: string };
+      const decoded = verifyToken(token);
       const adminId = decoded.id;
       const adminUser = await User.findByPk(adminId, { attributes: ["nickname", "cover"] });
       const adminNickname = adminUser?.nickname || "";
@@ -215,7 +215,6 @@ router.get("/", async (req: Request, res: Response) => {
           id: `reply-${c.id}`,
           type: "reply",
           actor: c.authorName || "访客",
-          actorEmail: c.email || "",
           content: c.content || "",
           postPreview: preview(postData?.content || "（图片动态）"),
           postType: thumb.type,

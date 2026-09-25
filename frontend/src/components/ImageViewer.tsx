@@ -10,7 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
-import type { PostImage } from "@/lib/mock-data";
+import type { PostImage } from "@/lib/types";
 import { getImageSrc, getVideoSrc } from "@/lib/post-image";
 
 interface ImageViewerProps {

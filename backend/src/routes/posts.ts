@@ -7,15 +7,17 @@ import { getClientIp } from "../utils/ip";
 import { getRegionByIp } from "../utils/region";
 import { generateShortId, extractCleanId } from "../utils/short-id";
 import { triggerRevalidate } from "../utils/revalidate";
-import { checkCommentRate, recordCommentSuccess, resetViolations } from "../middleware/rateLimit";
+import { checkCommentRate, checkIpRate, recordCommentSuccess, resetViolations } from "../middleware/rateLimit";
 import { blacklistService } from "../services/blacklist-service";
 import { sendCommentNotification } from "../services/email-service";
 import { parseVideoFromUrl, ParseError } from "./video-parse";
+import { avatarHash } from "../utils/avatar-hash";
+import { buildIdentity } from "../utils/identity";
+import { loadCommentLikeStats } from "../utils/comment-like-stats";
+import { enforceCommentGuard } from "../utils/comment-guard";
+import { resolveReplyToEmail } from "../utils/comment-utils";
 
 const router = Router();
-
-/** 自动临时封禁时长：1 小时 */
-const AUTO_BAN_DURATION = 60 * 60 * 1000;
 
 /**
  * 剥离文本中的 Frontmatter、HTML 标签与 Markdown 标记
@@ -99,30 +101,6 @@ function getCanonicalPostPath(post: { shortId?: string | null; id: string; type?
   if (post.category === "项目" || post.type === "project") return `/projects/${slug}`;
   if (post.type === "article" || post.type === "collection") return `/articles/${slug}`;
   return `/moments/${slug}`;
-}
-
-/**
- * WP Ulike 风格的访客身份识别：
- * 按优先级取第一个非空字段作为该用户的唯一标识：
- *   userId (已登录博主) > visitorId (cookie 游客) > email (评论过的游客) > ip (兜底)
- *
- * 互斥取一而非 OR 多重匹配——确保 meLiked 和 toggle 用完全一致的单一条件，
- * 彻底修复"显示已赞但无法取消"的不一致 bug。
- *
- * 返回 null 表示无法识别身份（无任何标识）。返回的对象其他维度字段置 null，
- * 与 Like 表的 4 个互斥 UNIQUE 索引 where 条件对齐。
- */
-export function buildIdentity(
-  userId?: string,
-  visitorId?: string,
-  email?: string,
-  ip?: string
-): { userId: string | null; visitorId: string | null; email: string | null; ip: string | null } | null {
-  if (userId) return { userId, visitorId: null, email: null, ip: null };
-  if (visitorId) return { visitorId, email: null, ip: null, userId: null };
-  if (email) return { email, ip: null, visitorId: null, userId: null };
-  if (ip) return { ip, visitorId: null, email: null, userId: null };
-  return null;
 }
 
 /**
@@ -274,28 +252,44 @@ function formatPost(
         ? { id: post.belongingCollection.id, shortId: post.belongingCollection.shortId, title: post.belongingCollection.title }
         : null,
       collectionContext: post.collectionContext || null,
-      author: post.author,
-      comments: sortCommentsThreaded((post.comments || []).map((c: any) => {
-        const likeData = commentLikesMap?.get(c.id);
-        const isAuthor = !!(authorEmail && c.email && String(c.email).toLowerCase() === authorEmail);
-        return {
-          id: c.id,
-          author: c.authorName,
-          email: c.email,
-          website: c.website,
-          replyTo: c.replyTo,
-          replyToEmail: c.replyToEmail,
-          replyToId: c.replyToId,
-          content: c.content,
-          createdAt: c.createdAt,
-          likeCount: likeData?.likeCount ?? 0,
-          meLiked: likeData?.meLiked ?? false,
-          isAuthor,
-          region: c.region || "",
-        };
-      })),
+      // 作者邮箱不下发：头像用 avatarHash，前端判断"是否博主"用 isOwner
+      author: post.author
+        ? {
+            id: post.author.id,
+            username: post.author.username,
+            nickname: post.author.nickname,
+            avatar: post.author.avatar,
+            avatarHash: avatarHash(post.author.email),
+            cover: post.author.cover,
+            bio: post.author.bio,
+            isOwner: (post.author as any).role === "admin",
+          }
+        : post.author,
+      comments: sortCommentsThreaded(
+        (post.comments || []).map((c: any) => {
+          const likeData = commentLikesMap?.get(c.id);
+          const isAuthor = !!(authorEmail && c.email && String(c.email).toLowerCase() === authorEmail);
+          return {
+            id: c.id,
+            author: c.authorName,
+            avatarHash: avatarHash(c.email),
+            // 内部字段：旧数据线程排序需要 author+email 双键，仅服务端使用，输出前剔除
+            email: c.email,
+            replyToEmail: c.replyToEmail,
+            website: c.website,
+            replyTo: c.replyTo,
+            replyToId: c.replyToId,
+            content: c.content,
+            createdAt: c.createdAt,
+            likeCount: likeData?.likeCount ?? 0,
+            meLiked: likeData?.meLiked ?? false,
+            isAuthor,
+            region: c.region || "",
+          };
+        })
+      ).map(({ email: _email, replyToEmail: _replyToEmail, ...pub }) => pub),
       likes: post.likes?.filter((l: any) => l.status === "like")
-        .map((l: any) => ({ name: l.name, email: l.email || l.user?.email || undefined })) || [],
+        .map((l: any) => ({ name: l.name, avatarHash: avatarHash(l.email || l.user?.email) })) || [],
       meLiked,
     };
 }
@@ -316,7 +310,7 @@ router.get("/", authenticateOptional, async (req: AuthRequest, res: Response) =>
   } else if (isAdmin && req.query.all === "1") {
     // 管理员请求全部状态
   } else {
-    // 非管理员或公共查询，严格只查已发布内容，杜绝草稿泄漏
+    // 非管理员或公共查询，只返回已发布内容
     where.status = "published";
   }
 
@@ -331,7 +325,7 @@ router.get("/", authenticateOptional, async (req: AuthRequest, res: Response) =>
   if (categoryParam) {
     where.category = categoryParam;
   } else if ((typeParam === "article" || typeParam === "moment") && req.query.includeProjects !== "1") {
-    // 纯文章与动态列表默认严格排除“项目”分类，确保与独立项目彻底分流
+    // 纯文章与动态列表默认排除“项目”分类（项目有独立页面）
     where.category = { [Op.ne]: "项目" };
   }
 
@@ -339,9 +333,23 @@ router.get("/", authenticateOptional, async (req: AuthRequest, res: Response) =>
     distinct: true,
     where,
     include: [
-      { model: User, as: "author", attributes: ["id", "email", "username", "nickname", "avatar", "cover", "bio"] },
-      { model: Comment, as: "comments" },
-      { model: Like, as: "likes", include: [{ model: User, as: "user", attributes: ["email"], required: false }] },
+      { model: User, as: "author", attributes: ["id", "email", "username", "nickname", "avatar", "cover", "bio", "role"] },
+      // separate: hasMany 拆为独立查询，避免 posts×comments×likes 的 JOIN 笛卡尔积；
+      // 属性白名单剔除敏感列（ip、replyToEmail 按需）与列表用不到的列
+      {
+        model: Comment,
+        as: "comments",
+        separate: true,
+        attributes: ["id", "postId", "authorName", "email", "website", "replyTo", "replyToEmail", "replyToId", "content", "region", "createdAt"],
+      },
+      {
+        model: Like,
+        as: "likes",
+        separate: true,
+        attributes: ["postId", "name", "email", "status", "createdAt"],
+        order: [["createdAt", "ASC"]],
+        include: [{ model: User, as: "user", attributes: ["email"], required: false }],
+      },
     ],
     order: [["pinned", "DESC"], ["createdAt", "DESC"]],
     limit,
@@ -371,38 +379,9 @@ router.get("/", authenticateOptional, async (req: AuthRequest, res: Response) =>
     likedPostIds = new Set(myLikes.map((l: any) => l.postId));
   }
 
-  // 全局批查询本页所有评论的点赞计数 + 当前访客点赞状态（2 次查询，避免 N+1）
+  // 全局批查询本页所有评论的点赞计数 + 当前访客点赞状态
   const allCommentIds = posts.flatMap((p: any) => (p.comments || []).map((c: any) => c.id));
-  const commentLikesMap = new Map<string, { likeCount: number; meLiked: boolean }>();
-  if (allCommentIds.length > 0) {
-    // 查询 1：每条评论的点赞计数
-    const likeCounts = await CommentLike.findAll({
-      attributes: ["commentId", [fn("COUNT", col("id")), "likeCount"]],
-      where: { commentId: { [Op.in]: allCommentIds }, status: "like" },
-      group: ["commentId"],
-      raw: true,
-    }) as any[];
-    for (const row of likeCounts) {
-      commentLikesMap.set(row.commentId, { likeCount: Number(row.likeCount), meLiked: false });
-    }
-    // 查询 2：当前访客的点赞状态（identity 维度互斥）
-    if (identity) {
-      const myCommentLikes = await CommentLike.findAll({
-        attributes: ["commentId"],
-        where: { commentId: { [Op.in]: allCommentIds }, status: "like", ...identity },
-        raw: true,
-      }) as any[];
-      for (const row of myCommentLikes) {
-        const existing = commentLikesMap.get(row.commentId);
-        if (existing) existing.meLiked = true;
-        else commentLikesMap.set(row.commentId, { likeCount: 0, meLiked: true });
-      }
-    }
-    // 补全无点赞记录的评论
-    for (const id of allCommentIds) {
-      if (!commentLikesMap.has(id)) commentLikesMap.set(id, { likeCount: 0, meLiked: false });
-    }
-  }
+  const commentLikesMap = await loadCommentLikeStats(allCommentIds, identity);
 
   // 1. 批量关联合辑（type === "collection"）的子文章列表
   const collectionPosts = posts.filter((p: any) => p.type === "collection");
@@ -505,9 +484,23 @@ router.get("/:id", authenticateOptional, async (req: AuthRequest, res: Response)
   const post = await Post.findOne({
     where,
     include: [
-      { model: User, as: "author", attributes: ["id", "email", "username", "nickname", "avatar", "cover", "bio"] },
-      { model: Comment, as: "comments" },
-      { model: Like, as: "likes", include: [{ model: User, as: "user", attributes: ["email"], required: false }] },
+      { model: User, as: "author", attributes: ["id", "email", "username", "nickname", "avatar", "cover", "bio", "role"] },
+      // separate: hasMany 拆为独立查询，避免 posts×comments×likes 的 JOIN 笛卡尔积；
+      // 属性白名单剔除敏感列（ip、replyToEmail 按需）与列表用不到的列
+      {
+        model: Comment,
+        as: "comments",
+        separate: true,
+        attributes: ["id", "postId", "authorName", "email", "website", "replyTo", "replyToEmail", "replyToId", "content", "region", "createdAt"],
+      },
+      {
+        model: Like,
+        as: "likes",
+        separate: true,
+        attributes: ["postId", "name", "email", "status", "createdAt"],
+        order: [["createdAt", "ASC"]],
+        include: [{ model: User, as: "user", attributes: ["email"], required: false }],
+      },
     ],
   });
 
@@ -546,35 +539,9 @@ router.get("/:id", authenticateOptional, async (req: AuthRequest, res: Response)
     meLiked = !!existing;
   }
 
-  // 批量查询评论点赞计数 + 当前访客点赞状态（2 次查询，避免 N+1）
+  // 批量查询评论点赞计数 + 当前访客点赞状态
   const commentIds = ((post as any).comments || []).map((c: any) => c.id);
-  const commentLikesMap = new Map<string, { likeCount: number; meLiked: boolean }>();
-  if (commentIds.length > 0) {
-    const likeCounts = await CommentLike.findAll({
-      attributes: ["commentId", [fn("COUNT", col("id")), "likeCount"]],
-      where: { commentId: { [Op.in]: commentIds }, status: "like" },
-      group: ["commentId"],
-      raw: true,
-    }) as any[];
-    for (const row of likeCounts) {
-      commentLikesMap.set(row.commentId, { likeCount: Number(row.likeCount), meLiked: false });
-    }
-    if (identity) {
-      const myCommentLikes = await CommentLike.findAll({
-        attributes: ["commentId"],
-        where: { commentId: { [Op.in]: commentIds }, status: "like", ...identity },
-        raw: true,
-      }) as any[];
-      for (const row of myCommentLikes) {
-        const existing = commentLikesMap.get(row.commentId);
-        if (existing) existing.meLiked = true;
-        else commentLikesMap.set(row.commentId, { likeCount: 0, meLiked: true });
-      }
-    }
-    for (const id of commentIds) {
-      if (!commentLikesMap.has(id)) commentLikesMap.set(id, { likeCount: 0, meLiked: false });
-    }
-  }
+  const commentLikesMap = await loadCommentLikeStats(commentIds, identity);
 
   // 1. 若自身为合辑，加载子文章列表
   if (post.type === "collection") {
@@ -726,9 +693,21 @@ router.post(
 
     const full = await Post.findByPk(post!.id, {
       include: [
-        { model: User, as: "author", attributes: ["id", "email", "username", "nickname", "avatar", "cover", "bio"] },
-        { model: Comment, as: "comments" },
-        { model: Like, as: "likes", include: [{ model: User, as: "user", attributes: ["email"], required: false }] },
+        { model: User, as: "author", attributes: ["id", "email", "username", "nickname", "avatar", "cover", "bio", "role"] },
+        {
+          model: Comment,
+          as: "comments",
+          separate: true,
+          attributes: ["id", "postId", "authorName", "email", "website", "replyTo", "replyToEmail", "replyToId", "content", "region", "createdAt"],
+        },
+        {
+          model: Like,
+          as: "likes",
+          separate: true,
+          attributes: ["postId", "name", "email", "status", "createdAt"],
+          order: [["createdAt", "ASC"]],
+          include: [{ model: User, as: "user", attributes: ["email"], required: false }],
+        },
       ],
     });
 
@@ -825,7 +804,7 @@ router.put(
   }
 );
 
-// PATCH /api/posts/:id/cover - 轻量极速修改文章或动态封面（无需提交全文，毫秒级即时生效）
+// PATCH /api/posts/:id/cover - 只更新封面，不提交正文
 router.patch(
   "/:id/cover",
   authenticate,
@@ -990,6 +969,11 @@ router.post(
       res.status(400).json({ errors: errors.array() });
       return;
     }
+    const rate = checkIpRate("video-refresh", getClientIp(req));
+    if (!rate.allowed) {
+      res.status(429).json({ message: "操作过于频繁，请稍后再试", retryAfter: rate.retryAfter });
+      return;
+    }
     const post = await Post.findByPk(req.params.id as string);
     if (!post) {
       res.status(404).json({ message: "动态不存在" });
@@ -1022,11 +1006,11 @@ router.post(
   "/:id/comments",
   [
     param("id").isUUID(),
-    body("content").trim().isLength({ min: 1 }),
+    body("content").trim().isLength({ min: 1, max: 10_000 }),
     body("authorName").trim().isLength({ min: 1, max: 100 }),
     body("email").trim().isEmail().normalizeEmail(),
     body("website").optional().trim().isLength({ max: 255 }),
-    body("replyTo").optional().trim(),
+    body("replyTo").optional().trim().isLength({ max: 100 }),
     body("replyToEmail").optional().trim().isEmail().normalizeEmail(),
     body("replyToId").optional({ checkFalsy: true }).isUUID(),
   ],
@@ -1049,46 +1033,11 @@ router.post(
     const email: string = req.body.email;
     const commentRegion = await getRegionByIp(ip);
 
-    // 评论防刷总开关：关闭时跳过黑名单和限流检查，仅记录 IP
-    const antiSpamEnabled = await blacklistService.isAntiSpamEnabled();
-    if (antiSpamEnabled) {
-      // 1. 黑名单检查（邮箱或 IP 任一命中即拒绝）
-      const ban = await blacklistService.check(email, ip);
-      if (ban.banned) {
-        const until = ban.expiresAt
-          ? new Date(ban.expiresAt).toLocaleString("zh-CN", { hour12: false })
-          : "永久";
-        res.status(403).json({
-          message: `您已被限制评论（原因：${ban.reason || "违规操作"}，解除时间：${until}）。如有疑问请联系管理员。`,
-          code: "BANNED",
-        });
-        return;
-      }
-
-      // 2. 限流检查：邮箱 10 秒内最多 2 条；IP 60 秒内最多 10 条
-      const rate = checkCommentRate(email, ip);
-      if (!rate.allowed) {
-        // 自动临时封禁：违规累计达阈值则写入黑名单
-        if (rate.banKey) {
-          await blacklistService.add(
-            rate.banKey.type,
-            rate.banKey.value,
-            "频繁刷评论自动封禁",
-            AUTO_BAN_DURATION
-          );
-          resetViolations(rate.banKey.type, rate.banKey.value);
-        }
-        const msg =
-          rate.reason === "RATE_LIMIT_EMAIL"
-            ? `评论太快了，请等待 ${rate.retryAfter} 秒后再试`
-            : `操作过于频繁，请稍后再试`;
-        res.status(429).json({
-          message: msg,
-          code: rate.reason,
-          retryAfter: rate.retryAfter,
-        });
-        return;
-      }
+    // 评论防刷：黑名单 + 限流 + 自动封禁（总开关关闭时放行）
+    const guard = await enforceCommentGuard(email, ip);
+    if (!guard.ok) {
+      res.status(guard.status).json(guard.body);
+      return;
     }
 
     // 3. 违禁词检查：评论内容包含违禁词时拒绝发布
@@ -1115,13 +1064,21 @@ router.post(
       }
     }
 
+    // 被回复者的邮箱由服务端从父评论推导，不信任客户端传值（公开接口已不下发明文邮箱）
+    const replyToEmail = await resolveReplyToEmail({
+      replyToId: req.body.replyToId || null,
+      replyTo: req.body.replyTo || null,
+      scope: { postId: post.id },
+      fallback: req.body.replyToEmail || null,
+    });
+
     const comment = await Comment.create({
       postId: post.id,
       authorName: req.body.authorName,
       email,
       website: req.body.website || null,
       replyTo: req.body.replyTo || null,
-      replyToEmail: req.body.replyToEmail || null,
+      replyToEmail: replyToEmail ?? undefined,
       replyToId: req.body.replyToId || null,
       content: req.body.content,
       ip,
@@ -1129,7 +1086,7 @@ router.post(
     });
 
     // 评论成功后记录一次命中（用于后续限流计数），并重置该用户的违规计数
-    if (antiSpamEnabled) recordCommentSuccess(email, ip);
+    if (guard.antiSpamEnabled) recordCommentSuccess(email, ip);
 
     // 服务端标记作者评论（与 formatPost 逻辑一致）
     const authorEmail = (post as any).author?.email ? String((post as any).author.email).toLowerCase() : "";
@@ -1138,10 +1095,9 @@ router.post(
     res.status(201).json({
       id: comment.id,
       author: comment.authorName,
-      email: comment.email,
+      avatarHash: avatarHash(comment.email),
       website: comment.website,
       replyTo: comment.replyTo,
-      replyToEmail: comment.replyToEmail,
       replyToId: comment.replyToId,
       content: comment.content,
       createdAt: comment.createdAt,
@@ -1342,7 +1298,7 @@ router.post(
       order: [["createdAt", "ASC"]],
     });
 
-    res.json({ liked, likes: likes.map((l: any) => ({ name: l.name, email: l.email || (l as any).user?.email || undefined })) });
+    res.json({ liked, likes: likes.map((l: any) => ({ name: l.name, avatarHash: avatarHash(l.email || (l as any).user?.email) })) });
 
     // 触发首页与详情页 ISR 重生成，确保刷新页面立即看到最新点赞状态
     triggerRevalidate([getCanonicalPostPath(post)]);

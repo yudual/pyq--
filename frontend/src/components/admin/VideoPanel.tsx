@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { Loader2, X, Video, Upload, Link2, Code2, Play } from "lucide-react";
-import type { PostVideo } from "@/lib/mock-data";
+import type { PostVideo } from "@/lib/types";
 import { toAbsoluteUrl, uploadVideo } from "@/lib/upload";
 import { PUBLIC_API_URL } from "@/lib/api-fetch";
 import AdminModal from "./AdminModal";

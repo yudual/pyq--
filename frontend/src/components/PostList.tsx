@@ -12,7 +12,7 @@ import { PostCardSkeleton, ArticleCardSkeleton } from "@/components/Skeleton";
 import { useSiteSettings } from "@/lib/site-settings-store";
 import { authFetchHeaders } from "@/lib/auth";
 import { subscribeContentUpdated } from "@/lib/content-sync";
-import type { Post } from "@/lib/mock-data";
+import type { Post } from "@/lib/types";
 
 
 export function FeedDispatcher({ post, index }: { post: Post; index: number }) {

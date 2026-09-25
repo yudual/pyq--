@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Code2, ExternalLink, FolderGit2, Link2 } from "lucide-react";
-import { formatExactDateTime, type Comment, type Post } from "@/lib/mock-data";
+import type { Comment, Post } from "@/lib/types";
+import { formatExactDateTime } from "@/lib/time-format";
 import { getImageSrc, extractFirstMarkdownImage } from "@/lib/post-image";
-import { resolveAvatar } from "@/lib/avatar";
+import { resolveAvatarFromHash } from "@/lib/avatar";
 import { toAbsoluteUrl, toHttps } from "@/lib/upload";
 import { useEffect, useMemo, useState } from "react";
 import { stripMarkdownAndHtml } from "@/lib/frontmatter";
@@ -102,11 +103,11 @@ export default function ProjectCard({ post, index, featured = false, variant = "
     const user = getCurrentUser();
     if (user?.isLoggedIn) {
       setIsAdmin(true);
-      const sameEmail = post.author?.email && user.email && post.author.email === user.email;
+      const sameOwner = post.author?.isOwner === true;
       const sameNickname = post.author?.nickname && user.nickname && post.author.nickname === user.nickname;
-      setCanEdit(!!(sameEmail || sameNickname));
+      setCanEdit(!!(sameOwner || sameNickname));
     }
-  }, [post.author?.email, post.author?.nickname]);
+  }, [post.author?.isOwner, post.author?.nickname]);
 
   useEffect(() => {
     setLiked(!!post.meLiked);
@@ -256,7 +257,7 @@ export default function ProjectCard({ post, index, featured = false, variant = "
 
   if (variant === "feed") {
     const authorName = post.author?.nickname || "博主";
-    const authorAvatar = resolveAvatar(post.author?.avatar, post.author?.email || "", 96);
+    const authorAvatar = resolveAvatarFromHash(post.author?.avatar, post.author?.avatarHash, 96);
     return (
       <article
         id={`post-${post.id}`}
@@ -412,7 +413,6 @@ export default function ProjectCard({ post, index, featured = false, variant = "
           <InteractionBubble
             likes={likes}
             comments={comments}
-            ownerEmail={post.author?.email}
             onReply={(commentId) => {
               setReplyTo(commentId);
               setShowComments(true);

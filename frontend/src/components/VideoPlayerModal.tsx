@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, RefreshCw, AlertCircle, ExternalLink } from "lucide-react";
-import type { PostVideo } from "@/lib/mock-data";
+import type { PostVideo } from "@/lib/types";
 import { toAbsoluteUrl } from "@/lib/upload";
 import { PUBLIC_API_URL } from "@/lib/api-fetch";
 import CustomVideoPlayer from "./CustomVideoPlayer";

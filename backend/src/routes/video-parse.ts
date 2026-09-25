@@ -8,6 +8,8 @@ import { Router, Request, Response } from "express";
 import axios from "axios";
 import { body, validationResult } from "express-validator";
 import { authenticate, requireAdmin } from "../middleware/auth";
+import { checkIpRate } from "../middleware/rateLimit";
+import { getClientIp } from "../utils/ip";
 
 const router = Router();
 
@@ -111,7 +113,6 @@ function selectBestVideoUrl(inner: any): string {
   const fallback = inner.url;
   const backups = inner.video_backup;
   if (!Array.isArray(backups) || backups.length === 0) {
-    console.log("[video-parse] video_backup 为空，回退到 inner.url");
     return fallback;
   }
 
@@ -124,12 +125,8 @@ function selectBestVideoUrl(inner: any): string {
   if (h264mp4.length > 0) {
     for (const q of qualityPriority) {
       const found = h264mp4.find((v: any) => v.quality === q);
-      if (found) {
-        console.log(`[video-parse] 选中 h264/mp4 ${q}，共 ${h264mp4.length} 个候选`);
-        return found.url;
-      }
+      if (found) return found.url;
     }
-    console.log(`[video-parse] 选中 h264/mp4 首项，共 ${h264mp4.length} 个候选`);
     return h264mp4[0].url;
   }
 
@@ -138,16 +135,12 @@ function selectBestVideoUrl(inner: any): string {
   if (anyMp4.length > 0) {
     for (const q of qualityPriority) {
       const found = anyMp4.find((v: any) => v.quality === q);
-      if (found) {
-        console.log(`[video-parse] 选中 mp4 ${q}（非h264），共 ${anyMp4.length} 个候选`);
-        return found.url;
-      }
+      if (found) return found.url;
     }
-    console.log(`[video-parse] 选中 mp4 首项（非h264），共 ${anyMp4.length} 个候选`);
     return anyMp4[0].url;
   }
 
-  console.log("[video-parse] 未找到 mp4 格式，回退到 inner.url（可能是 h265/DASH）");
+  // 未找到 mp4（可能是 h265/DASH），回退到原始 url
   return fallback;
 }
 
@@ -271,6 +264,12 @@ const REFRESH_CACHE_TTL = 30_000;
 // 公开端点（无需认证）：播放解析视频时重新获取新鲜 URL，因为存储的 URL 会过期。
 // skipCache=1 时跳过内存缓存，用于播放失败后自动重试获取新链接。
 router.get("/refresh", async (req: Request, res: Response) => {
+  const rate = checkIpRate("video-refresh", getClientIp(req));
+  if (!rate.allowed) {
+    res.status(429).json({ message: "操作过于频繁，请稍后再试", retryAfter: rate.retryAfter });
+    return;
+  }
+
   const sourceUrl = req.query.sourceUrl as string;
   if (!sourceUrl || typeof sourceUrl !== "string") {
     res.status(400).json({ message: "缺少 sourceUrl 参数" });
@@ -346,7 +345,6 @@ router.get("/proxy", async (req: Request, res: Response) => {
   if (referer) headers["Referer"] = referer;
   if (range) headers["Range"] = range;
 
-  const startedAt = Date.now();
   try {
     const resp = await axios.get(url, {
       responseType: "stream",
@@ -362,12 +360,9 @@ router.get("/proxy", async (req: Request, res: Response) => {
       // stream 模式下 axios 不会对 4xx/5xx 抛错，需手动 validateStatus
       validateStatus: () => true,
     });
-    const upstreamHost = new URL(resp.request?.res?.responseUrl || url).hostname;
-    console.log(`[video-proxy] upstream=${upstreamHost} status=${resp.status} range=${range || "none"} headerMs=${Date.now() - startedAt}`);
-
     // 上游返回 4xx/5xx：链接过期或防盗链拒绝，不 pipe 错误响应体
     if (resp.status >= 400) {
-      console.log(`[video-proxy] 上游 ${resp.status}：${parsedUrl.hostname}（链接可能已过期）`);
+      console.warn(`[video-proxy] 上游 ${resp.status}：${parsedUrl.hostname}（链接可能已过期）`);
       // 消耗掉错误响应流，防止连接泄漏
       resp.data.destroy();
       if (!res.headersSent) {
@@ -392,13 +387,13 @@ router.get("/proxy", async (req: Request, res: Response) => {
     };
     res.on("close", destroyUpstream);
     resp.data.once("error", (streamError: Error) => {
-      console.log(`[video-proxy] 流错误：${parsedUrl.hostname} - ${streamError.message}`);
+      console.warn(`[video-proxy] 流错误：${parsedUrl.hostname} - ${streamError.message}`);
       if (!res.headersSent) res.status(502).json({ message: "视频流中断，请重新解析" });
       else res.destroy(streamError);
     });
     resp.data.pipe(res);
   } catch (err: any) {
-    console.log(`[video-proxy] 请求异常：${parsedUrl.hostname} - ${err?.message || err}`);
+    console.warn(`[video-proxy] 请求异常：${parsedUrl.hostname} - ${err?.message || err}`);
     if (!res.headersSent) {
       res.status(502).json({ message: "视频代理失败" });
     }

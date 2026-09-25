@@ -41,6 +41,34 @@ export function resolveAvatar(avatar: string, email: string, size = 200): string
 }
 
 /**
+ * 由服务端下发的头像 hash（MD5 hex）构造 Cravatar URL。
+ * hash 缺失时回退到对 fallbackSource 做 hash（如评论者昵称）。
+ */
+export function cravatarUrlFromHash(
+  hash: string | null | undefined,
+  fallbackSource: string,
+  size = 200
+): string {
+  const h = hash || md5((fallbackSource || "").trim().toLowerCase());
+  return `https://cravatar.com/avatar/${h}?s=${size}&d=${DEFAULT_AVATAR_PARAM}&r=g`;
+}
+
+/**
+ * Resolve the avatar URL without touching the raw email:
+ * prefers the uploaded avatar, then the server-issued avatarHash.
+ */
+export function resolveAvatarFromHash(
+  avatar: string | null | undefined,
+  hash: string | null | undefined,
+  size = 200
+): string {
+  if (avatar && avatar.trim()) {
+    return toAbsoluteUrl(avatar);
+  }
+  return cravatarUrlFromHash(hash, "", size);
+}
+
+/**
  * 为通知列表中的 actor 生成头像 URL。
  * 有 email 用 email hash，无 email 用昵称 hash；统一用站点默认头像作为 fallback。
  */

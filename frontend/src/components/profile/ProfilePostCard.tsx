@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Play, Pause, Music2, Link as LinkIcon, FileText } from "lucide-react";
-import type { Post, PostMusic, PostImage } from "@/lib/mock-data";
+import type { Post, PostImage, PostMusic } from "@/lib/types";
 import { getImageSrc, resolveCoverImage } from "@/lib/post-image";
 import { toAbsoluteUrl, toHttps } from "@/lib/upload";
 import { renderContent } from "@/lib/sanitize";
