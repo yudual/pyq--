@@ -22,6 +22,10 @@ jobs:
         with:
           node-version: 20
           cache: 'pnpm'
+          # 根目录 lockfile 被 .gitignore 忽略，缓存依赖需指向已跟踪的子目录 lockfile
+          cache-dependency-path: |
+            backend/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
 
       # 1. 编译后端
       - name: Build Backend
