@@ -302,8 +302,9 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
                         {article.category}
                       </span>
                     )}
-                    <span className="group-hover/item:translate-x-0.5 transition-transform text-blue-600 dark:text-blue-400 flex items-center gap-0.5 text-xs font-medium">
-                      阅读 <ArrowRight className="h-3 w-3" />
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 px-2.5 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300 transition-colors group-hover/item:bg-blue-100 dark:group-hover/item:bg-blue-900/80">
+                      <span>阅读</span>
+                      <ArrowRight className="h-3 w-3 group-hover/item:translate-x-0.5 transition-transform" />
                     </span>
                   </div>
                 </Link>
@@ -337,9 +338,10 @@ export default function ArticleCollectionFeedCard({ post, index }: ArticleCollec
             <span>支持按序连贯阅读</span>
             <Link
               href={firstArticleUrl}
-              className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 dark:text-blue-300 dark:bg-blue-950/60 dark:hover:bg-blue-900/80 border border-blue-200/60 dark:border-blue-800/60 transition-colors"
             >
-              从第一篇开始阅读 <ArrowRight className="h-3 w-3" />
+              <span>从第一篇开始阅读</span>
+              <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
         </div>

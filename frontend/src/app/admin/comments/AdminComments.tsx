@@ -375,19 +375,19 @@ function CommentDetail({
             )}
           </div>
 
-          <div className="mt-3 flex gap-1.5">
+          <div className="mt-3 flex gap-2">
             <button
               onClick={() => onStartEdit(comment)}
-              className="flex items-center gap-1 rounded-lg bg-adm-card-hover px-3 py-1.5 text-xs text-adm-text-secondary transition-colors hover:bg-adm-card-hover/80"
+              className="flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text cursor-pointer"
             >
-              <Pencil className="h-3 w-3" />
+              <Pencil className="h-3.5 w-3.5" />
               编辑
             </button>
             <button
               onClick={() => onDelete(comment.id)}
-              className="flex items-center gap-1 rounded-lg bg-adm-danger-bg px-3 py-1.5 text-xs text-adm-danger transition-colors hover:bg-adm-danger/10"
+              className="flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-900/40 bg-adm-danger-bg px-3 py-1.5 text-xs font-medium text-adm-danger transition-colors hover:bg-red-100 dark:hover:bg-red-950/50 cursor-pointer"
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="h-3.5 w-3.5" />
               删除
             </button>
           </div>
@@ -582,20 +582,20 @@ function CommentEditCard({
             </div>
           )}
         </div>
-        <div className="flex justify-end gap-1.5">
+        <div className="flex justify-end gap-2">
           <button
             onClick={onCancelEdit}
-            className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
+            className="flex items-center gap-1 rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
           >
-            <X className="h-3 w-3" />
+            <X className="h-3.5 w-3.5" />
             取消
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-1 rounded-lg bg-adm-primary px-3 py-1.5 text-xs font-medium text-adm-primary-text transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg bg-adm-primary px-3.5 py-1.5 text-xs font-medium text-adm-primary-text shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            <Check className="h-3 w-3" />
+            <Check className="h-3.5 w-3.5" />
             保存
           </button>
         </div>
@@ -666,17 +666,17 @@ function CommentMobileCard({
                 </span>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1.5">
               <button
                 onClick={() => onStartEdit(comment)}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
+                className="flex items-center gap-1 rounded-lg border border-adm-border bg-adm-card px-2.5 py-1 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text"
               >
                 <Pencil className="h-3 w-3" />
                 编辑
               </button>
               <button
                 onClick={() => onDelete(comment.id)}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-adm-danger transition-colors hover:bg-adm-danger-bg"
+                className="flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-900/40 bg-adm-danger-bg px-2.5 py-1 text-xs font-medium text-adm-danger transition-colors hover:bg-red-100 dark:hover:bg-red-950/50"
               >
                 <Trash2 className="h-3 w-3" />
                 删除

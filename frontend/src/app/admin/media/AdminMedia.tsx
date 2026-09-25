@@ -250,11 +250,12 @@ export default function AdminMedia() {
           return (
             <button
               key={tab.value}
+              type="button"
               onClick={() => handleCategoryChange(tab.value)}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 active
                   ? "bg-adm-primary text-adm-primary-text"
-                  : "bg-adm-card text-adm-text-secondary border border-adm-border hover:bg-adm-hover"
+                  : "bg-adm-card text-adm-text-secondary border border-adm-border hover:bg-adm-card-hover"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -294,11 +295,12 @@ export default function AdminMedia() {
 
           {/* 分页 */}
           {pagination && pagination.totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
+            <div className="mt-6 flex items-center justify-center gap-3">
               <button
+                type="button"
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page <= 1}
-                className="rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-sm text-adm-text-secondary transition-colors hover:bg-adm-hover disabled:opacity-40"
+                className="adm-btn adm-btn--secondary"
               >
                 上一页
               </button>
@@ -306,9 +308,10 @@ export default function AdminMedia() {
                 {page} / {pagination.totalPages}（共 {pagination.total} 个）
               </span>
               <button
+                type="button"
                 onClick={() => setPage(Math.min(pagination.totalPages, page + 1))}
                 disabled={!pagination.hasMore}
-                className="rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-sm text-adm-text-secondary transition-colors hover:bg-adm-hover disabled:opacity-40"
+                className="adm-btn adm-btn--secondary"
               >
                 下一页
               </button>
@@ -561,7 +564,7 @@ function MediaDetailModal({
           <div className="mt-4 flex gap-2">
             <button
               onClick={() => onCopyUrl(item.url)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm font-medium text-adm-text-secondary transition-colors hover:bg-adm-hover"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
             >
               {copied ? (
                 <>

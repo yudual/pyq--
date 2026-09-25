@@ -828,13 +828,13 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
       )}
 
       {/* 顶部现代化操作控制栏（Linear / Ghost 质感） */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-adm-border bg-adm-bg/90 backdrop-blur-md py-2.5 px-4 sm:px-8 xl:px-10 mb-3">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-adm-border bg-adm-bg/95 backdrop-blur-md py-2.5 px-4 sm:px-8 xl:px-10 mb-3 shadow-2xs">
         {/* 左侧：返回 + 面包屑 + 保存状态指示 */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={handleBack}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-adm-border text-adm-text-secondary hover:bg-adm-input hover:text-adm-text transition-colors cursor-pointer shrink-0"
+            className="adm-icon-btn !h-8.5 !w-8.5 shrink-0"
             title="返回文章管理"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -845,26 +845,26 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
               文章
             </span>
             <ChevronRight className="h-3 w-3 text-adm-text-tertiary hidden sm:inline" />
-            <span className="font-semibold text-adm-text truncate max-w-[140px] sm:max-w-[240px]">
+            <span className="font-semibold text-adm-text truncate max-w-[140px] sm:max-w-[280px]">
               {title.trim() || (isEdit ? "编辑文章" : "写新文章")}
             </span>
           </div>
 
           <span
-            className={`hidden md:inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium border select-none ${
+            className={`hidden md:inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium border select-none ${
               currentStatus === "draft"
-                ? "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                : "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
             }`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${currentStatus === "draft" ? "bg-amber-500" : "bg-emerald-500"}`} />
-            {currentStatus === "draft" ? "草稿箱" : "已发布"}
+            <span>{currentStatus === "draft" ? "草稿箱" : "已发布"}</span>
           </span>
 
           {/* 实时改动状态小圆点 */}
           <span className="hidden lg:inline-flex items-center text-[11px] text-adm-text-tertiary ml-1">
             {isDirty ? (
-              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+              <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                 未保存更改
               </span>
@@ -879,12 +879,12 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           {/* 阅读字数与时间统计 */}
           <div className="hidden xl:flex items-center gap-2 text-xs text-adm-text-tertiary mr-1 select-none">
             <span className="flex items-center gap-1">
-              <FileText className="h-3 w-3" />
+              <FileText className="h-3.5 w-3.5" />
               {readingStats.count} 字
             </span>
             <span>·</span>
             <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
+              <Clock className="h-3.5 w-3.5" />
               约 {readingStats.minutes} 分钟
             </span>
           </div>
@@ -893,7 +893,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           <button
             type="button"
             onClick={() => markdownFileInputRef.current?.click()}
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-2.5 py-1.5 text-xs font-medium text-adm-text-secondary hover:bg-adm-input hover:text-adm-text transition-colors cursor-pointer"
+            className="hidden sm:inline-flex adm-btn adm-btn--secondary !h-8.5 !px-3 text-xs"
             title="选择本地 .md 文件导入（也可直接拖拽文件入编辑区）"
           >
             <Upload className="h-3.5 w-3.5" />
@@ -907,13 +907,13 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
               setShowDraftBox(true);
               fetchDraftArticles();
             }}
-            className="relative inline-flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-2.5 py-1.5 text-xs font-medium text-adm-text-secondary hover:bg-adm-input hover:text-adm-text transition-colors cursor-pointer"
+            className="relative adm-btn adm-btn--secondary !h-8.5 !px-3 text-xs"
             title="查看草稿箱"
           >
             <FolderOpen className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
             <span className="hidden sm:inline">草稿箱</span>
             {draftArticles.length > 0 && (
-              <span className="rounded-full bg-amber-500/90 text-white px-1.5 py-0.2 text-[10px] font-bold">
+              <span className="rounded-full bg-amber-500 text-white px-1.5 py-0.2 text-[10px] font-bold">
                 {draftArticles.length}
               </span>
             )}
@@ -924,7 +924,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
             type="button"
             onClick={() => handleSave("draft", { stay: true })}
             disabled={saving !== null}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-xs font-medium text-adm-text hover:bg-adm-input disabled:opacity-50 transition-colors cursor-pointer"
+            className="adm-btn adm-btn--secondary !h-8.5 !px-3 text-xs"
             title="静默存为草稿 (Ctrl/Cmd+S)"
           >
             {saving === "draft" ? (
@@ -939,10 +939,10 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           <button
             type="button"
             onClick={() => setShowSettingsDrawer(true)}
-            className={`relative inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+            className={`adm-btn !h-8.5 !px-3 text-xs ${
               cover
-                ? "border-emerald-500/60 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                : "border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-input hover:text-adm-text"
+                ? "border-emerald-500/60 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 hover:bg-emerald-100"
+                : "adm-btn--secondary"
             }`}
             title="查看或设置文章封面"
           >
@@ -957,10 +957,10 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
           <button
             type="button"
             onClick={() => setShowSettingsDrawer(true)}
-            className={`relative inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+            className={`adm-btn !h-8.5 !px-3 text-xs ${
               showSettingsDrawer
                 ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                : "border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-input hover:text-adm-text"
+                : "adm-btn--secondary"
             }`}
             title="展开文章属性抽屉（封面、分类、标签、发布时间、SEO）"
           >
@@ -973,7 +973,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
             type="button"
             onClick={() => handleSave("published", { stay: true })}
             disabled={saving !== null}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-semibold text-white transition-all hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 disabled:opacity-50 cursor-pointer shadow-xs active:scale-95"
+            className="adm-btn adm-btn--primary !h-8.5 !px-4 text-xs font-semibold"
             title="发布并同步至前台 (Ctrl/Cmd+Enter)"
           >
             {saving === "published" ? (
@@ -1029,7 +1029,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
       {/* 写作正文画布（无边框大标题 + Markdown 大画卷编辑器） */}
       <main className="flex-1 w-full max-w-[1580px] 2xl:max-w-[1760px] mx-auto px-4 sm:px-8 xl:px-10 flex flex-col space-y-3">
         {/* 沉浸式大标题输入区（无边框、自适应高度） */}
-        <div className="pt-2 pb-1 border-b border-adm-border/50">
+        <div className="pt-2 pb-2.5 border-b border-adm-border/60">
           <textarea
             ref={titleTextareaRef}
             value={title}
@@ -1042,6 +1042,46 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
             maxLength={200}
             className="w-full resize-none border-none bg-transparent text-2xl sm:text-4xl font-extrabold tracking-tight text-adm-text placeholder:text-adm-text-tertiary/40 focus:outline-none leading-tight"
           />
+
+          {/* 快捷元信息条：分类快选、字数统计 */}
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-medium text-adm-text-tertiary mr-0.5">常用分类:</span>
+              {CATEGORY_PRESETS.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategory(cat)}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
+                    category === cat
+                      ? "bg-adm-text text-adm-bg font-semibold shadow-2xs"
+                      : "bg-adm-input text-adm-text-secondary hover:bg-neutral-200 dark:hover:bg-neutral-800"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setShowSettingsDrawer(true)}
+                className="text-[11px] text-adm-text-secondary hover:text-adm-text hover:underline ml-1 cursor-pointer"
+              >
+                + 更多属性
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] text-adm-text-tertiary select-none">
+              <span className="flex items-center gap-1">
+                <FileText className="h-3 w-3" />
+                {readingStats.count} 字
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                约 {readingStats.minutes} 分钟
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Markdown 主编辑器组件（开阔视野，自适应视口高度） */}
@@ -1345,7 +1385,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
               <button
                 type="button"
                 onClick={() => setShowSettingsDrawer(false)}
-                className="flex-1 rounded-lg border border-adm-border bg-adm-card py-2 text-xs font-medium text-adm-text hover:bg-adm-input transition cursor-pointer"
+                className="flex-1 adm-btn adm-btn--secondary"
               >
                 完成
               </button>
@@ -1356,7 +1396,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
                   handleSave("published", { stay: true });
                 }}
                 disabled={saving !== null}
-                className="flex-1 rounded-lg bg-zinc-900 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 transition cursor-pointer disabled:opacity-50"
+                className="flex-1 adm-btn adm-btn--primary"
               >
                 {saving === "published" ? "发布中..." : "立即发布"}
               </button>
@@ -1382,7 +1422,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
                 href={`/articles/${publishedSuccessInfo.id}`}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-adm-border bg-adm-bg px-4 py-2.5 text-xs font-medium text-adm-text hover:bg-adm-input transition cursor-pointer"
+                className="w-full flex-1 adm-btn adm-btn--secondary"
               >
                 <Eye className="h-4 w-4" />
                 <span>新标签页查看</span>
@@ -1391,7 +1431,7 @@ export default function ArticleEditorPage({ articleId }: ArticleEditorPageProps)
               <button
                 type="button"
                 onClick={() => setPublishedSuccessInfo(null)}
-                className="w-full flex-1 inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 transition cursor-pointer"
+                className="w-full flex-1 adm-btn adm-btn--primary"
               >
                 留在当前页继续编辑
               </button>

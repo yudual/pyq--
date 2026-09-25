@@ -339,12 +339,13 @@ export default function AdminBlacklist() {
             }}
           />
           <button
+            type="button"
             onClick={handleAddBannedWord}
             disabled={savingBannedWords || !bannedWordInput.trim()}
-            className="flex items-center gap-1.5 rounded-lg bg-adm-primary px-4 py-2 text-sm font-medium text-adm-primary-text transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="adm-btn adm-btn--primary"
           >
             {savingBannedWords ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            添加
+            <span>添加</span>
           </button>
         </div>
 
@@ -444,12 +445,13 @@ export default function AdminBlacklist() {
           </div>
           {formError && <p className="text-xs text-adm-danger">{formError}</p>}
           <button
+            type="button"
             onClick={handleAdd}
             disabled={adding || !formValue.trim()}
-            className="flex items-center justify-center gap-1.5 rounded-lg bg-adm-primary px-4 py-2 text-sm font-medium text-adm-primary-text transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="adm-btn adm-btn--primary w-full"
           >
             {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            添加封禁
+            <span>添加封禁</span>
           </button>
         </div>
       </div>
@@ -541,11 +543,12 @@ export default function AdminBlacklist() {
                           {new Date(b.createdAt).toLocaleString("zh-CN", { hour12: false })}
                         </span>
                         <button
+                          type="button"
                           onClick={() => handleRemove(b.id)}
-                          className="flex items-center gap-1 rounded-lg bg-adm-danger-bg px-2 py-1 text-[11px] text-adm-danger transition-colors hover:bg-adm-danger/10"
+                          className="flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-900/40 bg-adm-danger-bg px-2.5 py-1 text-xs text-adm-danger transition-colors hover:bg-red-100 dark:hover:bg-red-950/50 cursor-pointer"
                         >
                           <Trash2 className="h-3 w-3" />
-                          解除封禁
+                          <span>解除封禁</span>
                         </button>
                       </div>
                     </div>

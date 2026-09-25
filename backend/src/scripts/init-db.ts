@@ -16,7 +16,7 @@ const DEFAULT_PLAYLIST_SLUG = "site-default";
 
 function adminConfig() {
   return {
-    email: process.env.ADMIN_EMAIL || "admin@kanle.net",
+    email: process.env.ADMIN_EMAIL || "admin@yugold.top",
     password: process.env.ADMIN_PASSWORD || "123456",
     username: process.env.ADMIN_USERNAME || "admin",
   };
@@ -73,10 +73,10 @@ async function ensureAdmin() {
     email,
     username,
     password: await bcrypt.hash(password, 10),
-    nickname: "小予",
+    nickname: "Dual",
     avatar: "",
     cover: "https://picsum.photos/seed/momentscover/1200/600",
-    bio: "这是一个朋友圈博客程序",
+    bio: "Dual 的个人博客 · YuBlog",
     role: "admin",
   });
   console.log(`Admin created (${admin.email}).`);

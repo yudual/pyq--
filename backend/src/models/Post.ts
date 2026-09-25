@@ -285,9 +285,9 @@ Post.init(
     tableName: "posts",
     indexes: [
       // 主列表：按 status + type 过滤、createdAt 排序
-      { name: "idx_posts_status_type_created", fields: ["status", "type", "createdAt"] },
+      { name: "idx_posts_status_type_created", fields: ["status", "type", "created_at"] },
       // 合辑子文章批量查询与 UPDATE ... WHERE collection_id
-      { name: "idx_posts_collection_id", fields: ["collectionId"] },
+      { name: "idx_posts_collection_id", fields: ["collection_id"] },
     ],
   }
 );

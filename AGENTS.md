@@ -1,6 +1,6 @@
 # Agent 协作与开发规范指南 (AGENTS.md)
 
-本项目为个人博客（Kanle / YuBlog），由前端 Next.js 与后端 Node.js (Express) 构成。所有 AI Agent（包括 Antigravity、Claude Code、Cursor 等）在协助开发时**必须严格遵守以下准则**：
+本项目为个人博客系统 **YuBlog**（Dual 二开定制版，线上主站：https://yugold.top），由前端 Next.js 与后端 Node.js (Express) 构成。所有 AI Agent（包括 Antigravity、Claude Code、Cursor 等）在协助开发时**必须严格遵守以下准则**：
 
 ---
 

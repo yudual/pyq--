@@ -195,10 +195,10 @@ export default function AdminFriends() {
         {!showForm && (
           <button
             onClick={startAdd}
-            className="flex items-center gap-1.5 rounded-xl bg-adm-primary px-4 py-2 text-sm font-medium text-adm-primary-text transition-colors hover:opacity-90"
+            className="adm-btn adm-btn--primary"
           >
             <Plus className="h-4 w-4" />
-            添加友链
+            <span>添加友链</span>
           </button>
         )}
       </div>
@@ -240,7 +240,7 @@ export default function AdminFriends() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="w-full rounded-xl border border-adm-border bg-adm-input px-3 py-2.5 text-sm text-adm-text transition-colors focus:border-adm-text-secondary focus:bg-adm-input-focus focus:outline-none focus:ring-1 focus:ring-adm-text-secondary"
-              placeholder="kanle"
+              placeholder="例如：YuBlog"
             />
           </div>
 
@@ -411,15 +411,15 @@ export default function AdminFriends() {
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-1.5 rounded-xl bg-adm-primary px-4 py-2 text-sm font-medium text-adm-primary-text transition-colors hover:opacity-90 disabled:opacity-50"
+              className="adm-btn adm-btn--primary"
             >
               <Save className="h-4 w-4" />
-              {saving ? "保存中..." : "保存"}
+              <span>{saving ? "保存中..." : "保存"}</span>
             </button>
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-xl border border-adm-border px-4 py-2 text-sm text-adm-text-secondary transition-colors hover:bg-adm-card-hover"
+              className="adm-btn adm-btn--secondary"
             >
               取消
             </button>
@@ -476,16 +476,22 @@ export default function AdminFriends() {
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 gap-1.5">
                 <button
+                  type="button"
                   onClick={() => startEdit(link)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-tertiary transition-colors hover:bg-adm-card-hover hover:text-adm-text-secondary"
+                  className="adm-icon-btn h-8 w-8 min-h-8 min-w-8"
+                  title="编辑友链"
+                  aria-label="编辑友链"
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleDelete(link.id)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-tertiary transition-colors hover:bg-adm-danger-bg hover:text-adm-danger"
+                  className="adm-icon-btn adm-icon-btn--danger h-8 w-8 min-h-8 min-w-8"
+                  title="删除友链"
+                  aria-label="删除友链"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

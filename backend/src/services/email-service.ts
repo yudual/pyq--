@@ -9,7 +9,7 @@ export function avatarUrl(email: string, size: number = 80): string {
     .createHash("md5")
     .update((email || "").trim().toLowerCase())
     .digest("hex");
-  const defaultAvatar = encodeURIComponent("https://kanle.net/default-avatar.jpg");
+  const defaultAvatar = encodeURIComponent("https://yugold.top/default-avatar.jpg");
   return `https://cravatar.com/avatar/${hash}?s=${size}&d=${defaultAvatar}&r=g`;
 }
 
@@ -207,7 +207,7 @@ async function buildEmailVars(data: CommentNotifyData): Promise<{
   const setting = await SiteSetting.findByPk(1);
   const owner = await User.findOne({ where: { role: "admin" } });
 
-  const siteName = setting?.siteName || "朋友圈博客";
+  const siteName = setting?.siteName || "YuBlog";
   const domain = setting?.domain || "";
   // 查找动态的 shortId 和 type 用于构造链接（文章用 /articles/{id}，动态用 /moments/{shortId}）
   const post = await Post.findByPk(data.postId, { attributes: ["shortId", "type", "id", "title"] });
@@ -319,7 +319,7 @@ export async function sendTestEmail(): Promise<{
 
     const setting = await SiteSetting.findByPk(1);
     const owner = await User.findOne({ where: { role: "admin" } });
-    const siteName = setting?.siteName || "朋友圈博客";
+    const siteName = setting?.siteName || "YuBlog";
     const domain = setting?.domain || "";
 
     const vars: Record<string, string> = {

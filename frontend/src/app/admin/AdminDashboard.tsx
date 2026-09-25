@@ -181,15 +181,15 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-2">
           <Link
             href="/admin/articles"
-            className="rounded-xl border border-adm-border bg-adm-card px-3.5 py-2 text-xs font-medium text-adm-text hover:bg-adm-card-hover transition-colors"
+            className="adm-btn adm-btn--secondary"
           >
             文章列表
           </Link>
           <Link
             href="/admin/articles/new"
-            className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+            className="adm-btn adm-btn--primary"
           >
-            <PenLine className="h-3.5 w-3.5" />
+            <PenLine className="h-4 w-4" />
             <span>撰写新文章</span>
           </Link>
         </div>

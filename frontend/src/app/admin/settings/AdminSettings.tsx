@@ -54,8 +54,8 @@ interface SiteSettings {
 }
 
 const DEFAULTS: SiteSettings = {
-  siteName: "朋友圈博客",
-  description: "一个像微信朋友圈一样的个人博客",
+  siteName: "YuBlog",
+  description: "Dual 的个人博客 · 朋友圈风格",
   keywords: "",
   domain: "",
   beian: "",
@@ -440,7 +440,7 @@ export default function AdminSettings() {
               value={form.siteName}
               onChange={(e) => setForm({ ...form, siteName: e.target.value })}
               className="w-full rounded-xl border border-adm-border bg-adm-input py-2.5 pl-10 pr-3 text-sm text-adm-text transition-colors focus:border-adm-text-secondary focus:bg-adm-input-focus focus:outline-none focus:ring-1 focus:ring-adm-text-secondary"
-              placeholder="朋友圈博客"
+              placeholder="YuBlog"
             />
           </div>
           <p className="mt-1.5 text-xs text-adm-text-tertiary">
@@ -809,17 +809,17 @@ export default function AdminSettings() {
         <button
           type="submit"
           disabled={saving}
-          className="flex items-center gap-2 rounded-xl bg-adm-primary px-5 py-2.5 text-sm font-medium text-adm-primary-text transition-colors hover:opacity-90 disabled:opacity-50"
+          className="adm-btn adm-btn--primary"
         >
           {saved ? (
             <>
               <Check className="h-4 w-4" />
-              已保存
+              <span>已保存</span>
             </>
           ) : (
             <>
               <Save className="h-4 w-4" />
-              {saving ? "保存中..." : "保存设置"}
+              <span>{saving ? "保存中..." : "保存设置"}</span>
             </>
           )}
         </button>

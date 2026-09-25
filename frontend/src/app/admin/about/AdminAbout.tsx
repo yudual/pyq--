@@ -120,33 +120,33 @@ export default function AdminAbout() {
             href="/about"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-3 py-2 text-xs font-medium text-adm-text transition-colors hover:bg-adm-border/40"
+            className="adm-btn adm-btn--secondary"
           >
-            <ExternalLink className="h-3.5 w-3.5" />
-            查看前台
+            <ExternalLink className="h-4 w-4" />
+            <span>查看前台</span>
           </Link>
 
           <button
             type="button"
             onClick={handleReset}
-            className="flex items-center gap-1.5 rounded-lg border border-adm-border bg-adm-card px-3 py-2 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-border/40 hover:text-adm-text cursor-pointer"
+            className="adm-btn adm-btn--quiet"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            重置默认
+            <RotateCcw className="h-4 w-4" />
+            <span>重置默认</span>
           </button>
 
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-1.5 rounded-lg bg-adm-primary px-4 py-2 text-xs font-medium text-adm-primary-text shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            className="adm-btn adm-btn--primary"
           >
             {saving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Save className="h-3.5 w-3.5" />
+              <Save className="h-4 w-4" />
             )}
-            保存自述 (Ctrl+S)
+            <span>保存自述 (Ctrl+S)</span>
           </button>
         </div>
       </div>

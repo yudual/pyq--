@@ -130,12 +130,12 @@ SiteSetting.init(
     siteName: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      defaultValue: "朋友圈博客",
+      defaultValue: "YuBlog",
     },
     description: {
       type: DataTypes.STRING(500),
       allowNull: false,
-      defaultValue: "一个像微信朋友圈一样的个人博客",
+      defaultValue: "Dual 的个人博客 · 朋友圈风格",
     },
     keywords: {
       type: DataTypes.STRING(255),
@@ -347,7 +347,7 @@ SiteSetting.init(
 );
 
 export const DEFAULT_FOOTER_HTML =
-  `© ${new Date().getFullYear()} <a href="https://kanle.net" target="_blank" rel="noopener noreferrer">kanle</a> by 小予 · 程序由AI生成`;
+  `© ${new Date().getFullYear()} <a href="https://yugold.top" target="_blank" rel="noopener noreferrer">YuBlog</a> by Dual · 致谢 <a href="https://kanle.net" target="_blank" rel="noopener noreferrer">小予</a>`;
 
 export const siteSettingTextDefaults = {
   backgroundImages: "[]",

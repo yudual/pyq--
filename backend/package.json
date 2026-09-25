@@ -1,8 +1,8 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "YuBlog Backend API Service",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",
     "build": "tsc",
@@ -20,8 +20,13 @@
     "db:migrate-article-collections": "ts-node src/scripts/migrate-article-collections.ts",
     "music:migrate-r2": "ts-node src/scripts/migrate-r2-music.ts"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "yublog",
+    "blog",
+    "express",
+    "mysql"
+  ],
+  "author": "Dual",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {

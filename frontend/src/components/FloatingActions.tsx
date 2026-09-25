@@ -57,7 +57,7 @@ export default function FloatingActions({ liftAboveBottomBar = false }: { liftAb
   const isDark = mounted && theme === "dark";
 
   const btnClass =
-    "misc-btn flex h-10 w-10 items-center justify-center rounded-xl border border-black/5 bg-white/70 text-black backdrop-blur-md shadow-sm transition-colors hover:bg-white/90 active:scale-90 dark:border-white/10 dark:bg-white/15 dark:text-white dark:hover:bg-white/25";
+    "misc-btn flex h-11 w-11 items-center justify-center rounded-2xl border border-black/5 bg-white/80 text-black backdrop-blur-md shadow-md transition-all duration-150 hover:bg-white active:scale-95 cursor-pointer dark:border-white/10 dark:bg-neutral-900/80 dark:text-white dark:hover:bg-neutral-800";
 
   return (
     <div

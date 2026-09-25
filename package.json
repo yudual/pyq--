@@ -1,8 +1,14 @@
 {
-  "name": "yublog-personal",
+  "name": "yublog",
   "version": "1.0.0",
   "private": true,
-  "description": "YuBlog / Kanle Personal Blog",
+  "description": "YuBlog - 基于微信朋友圈交互风格的现代化个人全栈博客系统（Dual 二开定制版）",
+  "author": "Dual <admin@yugold.top>",
+  "homepage": "https://yugold.top",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yudual/yublog.git"
+  },
   "scripts": {
     "dev": "node scripts/dev.js",
     "dev:fe": "cd frontend && pnpm dev",

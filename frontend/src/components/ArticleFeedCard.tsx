@@ -287,8 +287,9 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
                   <Clock className="h-3 w-3" />
                   {readMinutes} 分钟阅读
                 </span>
-                <span className="font-medium text-emerald-600 dark:text-emerald-400 group-hover/card:translate-x-0.5 transition-transform inline-flex items-center gap-0.5">
-                  阅读全文 <ArrowRight className="h-3 w-3" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/60 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 group-hover/card:bg-emerald-100 dark:group-hover/card:bg-emerald-900/80 transition-colors">
+                  <span>阅读全文</span>
+                  <ArrowRight className="h-3 w-3 group-hover/card:translate-x-0.5 transition-transform" />
                 </span>
               </div>
             </div>
@@ -304,13 +305,6 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
               <time dateTime={post.createdAt} title={post.createdAt}>{exactDateTime}</time>
             </Link>
             <div className="flex items-center gap-2">
-              <Link
-                href={detailUrl}
-                className="text-xs text-neutral-400 hover:text-emerald-600 dark:text-neutral-500 dark:hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
-              >
-                <span>查看文章</span>
-                <ArrowRight className="h-3 w-3" />
-              </Link>
               <ActionMenu
                 onLike={post.likesDisabled ? undefined : handleLike}
                 onComment={post.commentsDisabled ? undefined : handleCommentClick}
@@ -450,7 +444,7 @@ export default function ArticleFeedCard({ post, index, variant = "standalone" }:
 
             <Link
               href={detailUrl}
-              className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors group-hover:translate-x-0.5 transition-transform shrink-0"
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100/90 dark:text-emerald-300 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 border border-emerald-200/80 dark:border-emerald-800/60 shadow-2xs transition-all duration-150 group-hover:translate-x-0.5 shrink-0"
             >
               <span>阅读全文</span>
               <ArrowRight className="h-3.5 w-3.5" />

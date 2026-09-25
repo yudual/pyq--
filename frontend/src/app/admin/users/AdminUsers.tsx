@@ -752,10 +752,10 @@ export default function AdminUsers() {
         <button
           type="submit"
           disabled={changingPassword}
-          className="flex items-center gap-2 rounded-xl border border-adm-border bg-adm-card px-5 py-2.5 text-sm font-medium text-adm-text transition-colors hover:bg-adm-card-hover disabled:opacity-50"
+          className="adm-btn adm-btn--secondary"
         >
           <Lock className="h-4 w-4" />
-          {changingPassword ? "修改中..." : "修改密码"}
+          <span>{changingPassword ? "修改中..." : "修改密码"}</span>
         </button>
       </form>
       </div>

@@ -1,7 +1,9 @@
 {
   "name": "frontend",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "YuBlog Frontend Application - Next.js 16 & React 19",
+  "author": "Dual",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

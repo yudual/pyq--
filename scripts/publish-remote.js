@@ -2,8 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-// 确保在 VPS backend 目录下运行
-const backendDir = process.env.BACKEND_DIR || "/opt/kanle/backend";
+// 支持指定环境变量，默认定位到本仓库 backend 目录
+const backendDir = process.env.BACKEND_DIR || path.join(__dirname, "../backend");
 require("dotenv").config({ path: path.join(backendDir, ".env") });
 
 const { Post, User } = require(path.join(backendDir, "dist/models"));
@@ -19,7 +19,7 @@ async function run() {
   }
   console.log(`[+] 确定发布作者: ${admin.nickname || admin.username} (ID: ${admin.id})`);
 
-  const importDir = process.env.IMPORT_DIR || "/tmp/kanle-import/弹药群情报整合与全景信息库";
+  const importDir = process.env.IMPORT_DIR || path.join(__dirname, "../import-data");
   if (!fs.existsSync(importDir)) {
     throw new Error(`找不到文章源目录: ${importDir}`);
   }

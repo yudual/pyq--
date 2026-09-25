@@ -690,10 +690,10 @@ export default function ArticleCommentSection({
               type="button"
               data-no-collapse
               onClick={() => setInlineShowEmoji((v) => !v)}
-              className={`absolute bottom-2 right-2 transition-colors ${inlineShowEmoji ? "text-[#07c160]" : "text-wechat-time hover:text-wechat-text"}`}
+              className={`absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-md transition-colors cursor-pointer ${inlineShowEmoji ? "text-[#07c160]" : "text-wechat-time hover:text-wechat-text hover:bg-black/5 dark:hover:bg-white/5"}`}
               aria-label="表情"
             >
-              <Smile className="h-5 w-5 md:h-[18px] md:w-[18px]" />
+              <Smile className="h-4 w-4 md:h-[18px] md:w-[18px]" />
             </button>
           </div>
           {/* emoji 选择器 — 与底部编辑器同风格 */}
@@ -735,7 +735,7 @@ export default function ArticleCommentSection({
               type="button"
               onClick={handleInlineSubmit}
               disabled={inlineSubmitting}
-              className="rounded-[4px] bg-[#07c160] px-4 py-1.5 text-[14px] font-medium text-white transition-colors hover:bg-[#06ad56] disabled:bg-gray-300 disabled:text-white"
+              className="btn-wechat-primary px-3.5 py-1 text-[13px]"
             >
               {inlineSubmitting ? "发送中" : "发送"}
             </button>
@@ -811,14 +811,14 @@ export default function ArticleCommentSection({
                       <button
                         type="button"
                         onClick={() => setEditing(false)}
-                        className="flex-1 rounded-[4px] bg-gray-100 px-1.5 py-2 text-center text-[13px] text-gray-500 transition-colors hover:bg-gray-200 dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10"
+                        className="flex-1 rounded-lg bg-black/5 dark:bg-white/10 px-2 py-1.5 text-center text-[13px] font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-black/10 dark:hover:bg-white/15 cursor-pointer"
                       >
                         取消
                       </button>
                       <button
                         type="button"
                         onClick={handleSaveInfo}
-                        className="flex-1 rounded-[4px] bg-[#07c160] px-1.5 py-2 text-center text-[13px] font-medium text-white transition-colors hover:bg-[#06ad56]"
+                        className="flex-1 rounded-lg bg-[#07c160] px-2 py-1.5 text-center text-[13px] font-medium text-white shadow-xs transition-all hover:bg-[#06ad56] active:scale-95 cursor-pointer"
                       >
                         保存
                       </button>
@@ -894,10 +894,10 @@ export default function ArticleCommentSection({
                       setShowEmoji(next);
                       if (next) setEmojiExpanded(false);
                     }}
-                    className={`absolute bottom-2 right-2 transition-colors ${showEmoji ? "text-[#07c160]" : "text-wechat-time hover:text-wechat-text"}`}
+                    className={`absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-md transition-colors cursor-pointer ${showEmoji ? "text-[#07c160]" : "text-wechat-time hover:text-wechat-text hover:bg-black/5 dark:hover:bg-white/5"}`}
                     aria-label="表情"
                   >
-                    <Smile className="h-5 w-5 md:h-[18px] md:w-[18px]" />
+                    <Smile className="h-4 w-4 md:h-[18px] md:w-[18px]" />
                   </button>
                 </div>
 
@@ -959,7 +959,7 @@ export default function ArticleCommentSection({
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="rounded-[4px] bg-[#07c160] px-4 py-1.5 text-[14px] font-medium text-white transition-colors hover:bg-[#06ad56] disabled:bg-gray-300 disabled:text-white"
+                    className="btn-wechat-primary px-4 py-1.5 text-[14px]"
                   >
                     {submitting ? "发送中" : "发送"}
                   </button>

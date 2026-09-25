@@ -269,7 +269,7 @@ export default function InteractionBubble({
         <button
           type="button"
           onClick={() => setExpanded((prev) => !prev)}
-          className="mt-1.5 text-[14px] text-[#b2b2b2] transition-opacity hover:opacity-70 active:opacity-50 dark:text-[#888] md:text-[15px]"
+          className="mt-1.5 inline-flex items-center rounded px-1.5 py-0.5 -ml-1 text-[13px] font-medium text-wechat-link transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:opacity-60 md:text-[14px] cursor-pointer"
         >
           {expanded ? "收起" : "展开"}
         </button>

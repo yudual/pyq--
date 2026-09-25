@@ -31,11 +31,11 @@ export default function ActionMenu({
   // 访客时只有赞/评论/分享，用稍大舒适尺寸
   const isFullMenu = !!(onPin || onEdit || onDelete);
   const itemCls = isFullMenu
-    ? "flex h-full items-center gap-[4px] whitespace-nowrap px-2.5 md:gap-1.5 md:px-3.5 text-[12px] md:text-[14px] font-medium hover:bg-[#5c5c5c] transition-colors cursor-pointer"
-    : "flex h-full items-center gap-1.5 md:gap-2 whitespace-nowrap px-3.5 md:px-4 text-[13px] md:text-[14px] font-medium hover:bg-[#5c5c5c] transition-colors cursor-pointer";
+    ? "flex h-full items-center gap-1 whitespace-nowrap px-2.5 md:gap-1.5 md:px-3 text-[12px] md:text-[13px] font-medium hover:bg-white/15 active:bg-white/25 transition-colors cursor-pointer"
+    : "flex h-full items-center gap-1.5 md:gap-2 whitespace-nowrap px-3.5 md:px-4 text-[13px] md:text-[14px] font-medium hover:bg-white/15 active:bg-white/25 transition-colors cursor-pointer";
   const iconCls = isFullMenu
-    ? "h-[14px] w-[14px] md:h-[16px] md:w-[16px]"
-    : "h-[16px] w-[16px] md:h-[18px] md:w-[18px]";
+    ? "h-[14px] w-[14px] md:h-[15px] md:w-[15px]"
+    : "h-[16px] w-[16px] md:h-[17px] md:w-[17px]";
 
   useEffect(() => {
     if (!open) return;
@@ -69,18 +69,18 @@ export default function ActionMenu({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex h-[20px] w-[28px] items-center justify-center rounded-[4px] bg-wechat-bubble transition-colors hover:bg-wechat-hover active:bg-wechat-border cursor-pointer"
+        className="group relative flex h-[24px] w-[34px] items-center justify-center rounded-[5px] bg-wechat-bubble transition-all duration-150 hover:bg-wechat-hover active:scale-95 active:bg-wechat-border cursor-pointer before:absolute before:-inset-2 before:content-['']"
         aria-label="操作"
       >
-        <span className="flex items-center gap-[3px]">
-          <span className="h-[3px] w-[3px] rounded-full bg-wechat-nickname" />
-          <span className="h-[3px] w-[3px] rounded-full bg-wechat-nickname" />
+        <span className="flex items-center gap-[4px] transition-transform duration-150 group-hover:scale-110">
+          <span className="h-[3.5px] w-[3.5px] rounded-full bg-wechat-nickname" />
+          <span className="h-[3.5px] w-[3.5px] rounded-full bg-wechat-nickname" />
         </span>
       </button>
 
       {/* 弹出菜单：赞 / 评论 / 分享 / 置顶 / 编辑 / 删除 — 微信朋友圈风格 */}
       {open && (
-        <div className="absolute right-full top-1/2 z-20 mr-1.5 flex h-[38px] origin-right -translate-y-1/2 items-center overflow-hidden rounded-[7px] bg-[#4c4c4c] text-white shadow-lg animate-pop-in">
+        <div className="absolute right-full top-1/2 z-20 mr-2 flex h-[38px] origin-right -translate-y-1/2 items-center overflow-hidden rounded-[8px] bg-[#4c4c4c] dark:bg-[#38383a] text-white shadow-xl animate-pop-in">
           {(() => {
             const items: React.ReactNode[] = [];
             if (onLike) {

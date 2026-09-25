@@ -182,8 +182,8 @@ export default function CatalogManager({ collection, title, description }: Props
           <h1 className="text-xl font-bold text-adm-text">{title}</h1>
           <p className="mt-1 text-sm text-adm-text-secondary">{description}</p>
         </div>
-        <button onClick={() => openCategory({ name: "", intro: "" })} className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-gray-900">
-          <Plus className="h-4 w-4" /> 新建分类
+        <button onClick={() => openCategory({ name: "", intro: "" })} className="adm-btn adm-btn--primary">
+          <Plus className="h-4 w-4" /> <span>新建分类</span>
         </button>
       </div>
 
@@ -227,11 +227,11 @@ export default function CatalogManager({ collection, title, description }: Props
 }
 
 function IconButton({ children, title, onClick, danger = false }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
-  return <button type="button" title={title} onClick={onClick} className={`rounded-md p-1.5 transition-colors hover:bg-adm-input ${danger ? "text-adm-danger" : "text-adm-text-secondary"}`}>{children}</button>;
+  return <button type="button" title={title} aria-label={title} onClick={onClick} className={`adm-icon-btn ${danger ? "adm-icon-btn--danger" : ""}`}>{children}</button>;
 }
 
 function EditCategory({ data, setData, onSave, onClose, saving }: { data: CategoryDraft; setData: (data: CategoryDraft) => void; onSave: () => void; onClose: () => void; saving: boolean }) {
-  return <div className="mb-4 rounded-xl border border-adm-border bg-adm-card p-4"><div className="mb-3 flex justify-between"><h2 className="font-semibold text-adm-text">{data.id ? "编辑分类" : "新建分类"}</h2><button type="button" onClick={onClose}><X className="h-4 w-4" /></button></div><div className="space-y-3"><input value={data.name} onChange={(e) => setData({ ...data, name: e.target.value })} placeholder="分类名称" className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm" /><textarea value={data.intro} onChange={(e) => setData({ ...data, intro: e.target.value })} placeholder="一句话简介" className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm" rows={2} /><button type="button" onClick={onSave} disabled={saving} className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white dark:bg-white dark:text-gray-900">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}保存</button></div></div>;
+  return <div className="mb-4 rounded-xl border border-adm-border bg-adm-card p-4"><div className="mb-3 flex justify-between items-center"><h2 className="font-semibold text-adm-text">{data.id ? "编辑分类" : "新建分类"}</h2><button type="button" onClick={onClose} aria-label="关闭" className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-tertiary transition-colors hover:bg-adm-card-hover hover:text-adm-text"><X className="h-4 w-4" /></button></div><div className="space-y-3"><input value={data.name} onChange={(e) => setData({ ...data, name: e.target.value })} placeholder="分类名称" className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm" /><textarea value={data.intro} onChange={(e) => setData({ ...data, intro: e.target.value })} placeholder="一句话简介" className="w-full rounded-lg border border-adm-border bg-adm-input px-3 py-2 text-sm" rows={2} /><button type="button" onClick={onSave} disabled={saving} className="adm-btn adm-btn--primary">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}<span>保存</span></button></div></div>;
 }
 
 function EditItem({ collection, data, setData, onSave, onClose, onPick, saving }: { collection: Collection; data: ItemDraft; setData: (data: ItemDraft) => void; onSave: () => void; onClose: () => void; onPick: () => void; saving: boolean }) {
@@ -253,9 +253,9 @@ function EditItem({ collection, data, setData, onSave, onClose, onPick, saving }
   };
   return (
     <div className="mb-4 rounded-xl border border-adm-border bg-adm-card p-4">
-      <div className="mb-3 flex justify-between">
+      <div className="mb-3 flex justify-between items-center">
         <h2 className="font-semibold text-adm-text">{data.id ? "编辑卡片" : "添加卡片"}</h2>
-        <button type="button" onClick={onClose}><X className="h-4 w-4" /></button>
+        <button type="button" onClick={onClose} aria-label="关闭" className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-tertiary transition-colors hover:bg-adm-card-hover hover:text-adm-text"><X className="h-4 w-4" /></button>
       </div>
       <div className="grid gap-4 md:grid-cols-[150px_1fr]">
         <div className="space-y-2">
@@ -372,10 +372,10 @@ function EditItem({ collection, data, setData, onSave, onClose, onPick, saving }
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white dark:bg-white dark:text-gray-900"
+            className="adm-btn adm-btn--primary"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            保存
+            <span>保存</span>
           </button>
         </div>
       </div>

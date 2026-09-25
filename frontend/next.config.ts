@@ -6,6 +6,9 @@ const MEDIA_HOST = process.env.NEXT_PUBLIC_MEDIA_ORIGIN
   : null;
 
 const nextConfig: NextConfig = {
+  // Pi's browser preview reaches the dev server through these host interfaces.
+  // Next blocks cross-origin dev assets/HMR unless the forwarded origins are allowed.
+  allowedDevOrigins: ["161.33.5.19", "10.0.0.49"],
   output: "standalone",
   staticPageGenerationTimeout: 300,
   experimental: {

@@ -33,7 +33,7 @@ interface SiteSettingsState {
   fetchSettings: () => Promise<void>;
 }
 
-const DEFAULT_SITE_NAME = "朋友圈博客";
+const DEFAULT_SITE_NAME = "YuBlog";
 
 /** 从 localStorage 读取缓存的 siteName/faviconUrl，避免页面初次渲染时闪烁 */
 function loadCachedDisplay(): { siteName: string; faviconUrl: string } {

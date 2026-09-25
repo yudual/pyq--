@@ -562,17 +562,17 @@ export default function AdminArticlesPage() {
               fetchCollections();
               setShowManageModal(true);
             }}
-            className="flex items-center gap-1.5 rounded-xl border border-adm-border bg-adm-card px-3.5 py-2 text-sm font-medium text-adm-text hover:bg-adm-card-hover transition-colors shadow-xs"
+            className="adm-btn adm-btn--secondary"
           >
             <Layers className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <span>合辑管理 ({collections.length})</span>
           </button>
           <Link
             href="/admin/articles/new"
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200 cursor-pointer shadow-xs"
+            className="adm-btn adm-btn--primary"
           >
             <PenLine className="h-4 w-4" />
-            写新文章
+            <span>写新文章</span>
           </Link>
         </div>
       </div>
@@ -728,9 +728,10 @@ export default function AdminArticlesPage() {
           <p className="mt-3 text-sm text-adm-text-secondary">还没有文章</p>
           <Link
             href="/admin/articles/new"
-            className="mt-4 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+            className="mt-4 adm-btn adm-btn--primary"
           >
-            写第一篇文章 →
+            <PenLine className="h-4 w-4" />
+            <span>写第一篇文章</span>
           </Link>
         </div>
       ) : (
@@ -856,7 +857,7 @@ export default function AdminArticlesPage() {
                             href={`/articles/${article.shortId || article.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-input hover:text-adm-text cursor-pointer"
+                            className="adm-icon-btn h-8 w-8 min-h-8 min-w-8"
                             title="前台新窗口浏览"
                           >
                             <ExternalLink className="h-4 w-4" />
@@ -867,7 +868,7 @@ export default function AdminArticlesPage() {
                           <button
                             type="button"
                             onClick={() => handleCopyLink(article)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-input hover:text-adm-text cursor-pointer"
+                            className="adm-icon-btn h-8 w-8 min-h-8 min-w-8"
                             title="复制文章公开链接"
                           >
                             <Copy className="h-4 w-4" />
@@ -879,7 +880,7 @@ export default function AdminArticlesPage() {
                             type="button"
                             onClick={() => handlePin(article.id, !!article.pinned)}
                             disabled={pinning === article.id}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-input hover:text-adm-text disabled:opacity-50 cursor-pointer"
+                            className="adm-icon-btn h-8 w-8 min-h-8 min-w-8"
                             title={article.pinned ? "取消置顶" : "首页置顶"}
                           >
                             {pinning === article.id ? (
@@ -897,7 +898,7 @@ export default function AdminArticlesPage() {
                           type="button"
                           onClick={() => handleToggleStatus(article)}
                           disabled={updatingStatusId === article.id}
-                          className={`px-3 py-1 text-xs rounded-lg font-medium transition cursor-pointer flex items-center gap-1 shrink-0 ${
+                          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition cursor-pointer flex items-center gap-1 shrink-0 ${
                             article.status === "draft"
                               ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300/40"
                               : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 border border-neutral-300/40"
@@ -913,7 +914,7 @@ export default function AdminArticlesPage() {
                         <button
                           type="button"
                           onClick={() => setQuickCoverTarget(article)}
-                          className="flex items-center gap-1 rounded-lg border border-adm-border bg-adm-bg px-2.5 py-1 text-xs font-medium text-adm-text hover:bg-adm-input transition cursor-pointer"
+                          className="flex items-center gap-1 rounded-lg border border-adm-border bg-adm-card px-2.5 py-1 text-xs font-medium text-adm-text hover:bg-adm-card-hover transition cursor-pointer"
                           title="快捷更换/设置封面"
                         >
                           <ImageIcon className="h-3.5 w-3.5 text-blue-500" />
@@ -933,7 +934,7 @@ export default function AdminArticlesPage() {
                           type="button"
                           onClick={() => handleDelete(article)}
                           disabled={deleting === article.id}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:hover:bg-red-500/10 cursor-pointer"
+                          className="adm-icon-btn adm-icon-btn--danger h-8 w-8 min-h-8 min-w-8"
                           title="彻底删除文章"
                         >
                           {deleting === article.id ? (
@@ -962,7 +963,7 @@ export default function AdminArticlesPage() {
                       </div>
 
                       {/* Actions on mobile */}
-                      <div className="flex sm:hidden items-center gap-1">
+                      <div className="flex sm:hidden items-center gap-1.5">
                         {isInCollection && (
                           <button
                             type="button"
@@ -975,7 +976,7 @@ export default function AdminArticlesPage() {
                         <button
                           type="button"
                           onClick={() => setQuickCoverTarget(article)}
-                          className="flex h-7 w-7 items-center justify-center rounded text-adm-text-secondary hover:bg-adm-input"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-card-hover"
                           title="快捷设置封面"
                         >
                           <ImageIcon className="h-3.5 w-3.5 text-blue-500" />
@@ -984,7 +985,7 @@ export default function AdminArticlesPage() {
                           type="button"
                           onClick={() => handleToggleStatus(article)}
                           disabled={updatingStatusId === article.id}
-                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-adm-input text-adm-text disabled:opacity-50"
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-adm-border bg-adm-card text-adm-text disabled:opacity-50"
                         >
                           {updatingStatusId === article.id && <Loader2 className="h-3 w-3 animate-spin" />}
                           {article.status === "draft" ? "发布" : "下架"}
@@ -993,7 +994,7 @@ export default function AdminArticlesPage() {
                           <button
                             type="button"
                             onClick={() => handleCopyLink(article)}
-                            className="flex h-7 w-7 items-center justify-center rounded text-adm-text-secondary hover:bg-adm-input"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-card-hover"
                             title="复制链接"
                           >
                             <Copy className="h-3.5 w-3.5" />
@@ -1001,7 +1002,7 @@ export default function AdminArticlesPage() {
                         )}
                         <Link
                           href={`/admin/articles/${article.id}`}
-                          className="flex h-7 w-7 items-center justify-center rounded text-adm-text-secondary hover:bg-adm-input"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-card-hover"
                           title="编辑"
                         >
                           <PenLine className="h-3.5 w-3.5" />
@@ -1009,7 +1010,7 @@ export default function AdminArticlesPage() {
                         <button
                           type="button"
                           onClick={() => handleDelete(article)}
-                          className="flex h-7 w-7 items-center justify-center rounded text-adm-text-secondary hover:text-red-500"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 dark:border-red-900/40 bg-adm-danger-bg text-adm-danger hover:bg-red-100 dark:hover:bg-red-950/50"
                           title="删除"
                         >
                           <Trash2 className="h-3.5 w-3.5" />

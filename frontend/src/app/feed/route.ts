@@ -97,8 +97,8 @@ export async function GET() {
     // 先读站点设置：RSS 总开关关闭时直接返回 404，不再请求帖子列表
     const settingsRes = await fetch(`${API_URL}/settings`, { next: { revalidate: 60 } });
 
-    let siteName = "朋友圈博客";
-    let description = "一个像微信朋友圈一样的个人博客";
+    let siteName = "YuBlog";
+    let description = "Dual 的个人博客 · 朋友圈风格";
     let domain = "";
     let rssEnabled = true;
     let rssIncludeMoments = true;
@@ -184,7 +184,7 @@ export async function GET() {
     <link>${escapeXml(domain)}</link>
     <description>${escapeXml(description)}</description>
     <language>zh-CN</language>
-    <generator>朋友圈博客</generator>
+    <generator>YuBlog</generator>
     <atom:link href="${escapeXml(domain)}/feed" rel="self" type="application/rss+xml" />
 ${items}
   </channel>

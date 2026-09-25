@@ -93,10 +93,10 @@ export default async function ArticleDetailPage({
       <div className="relative mx-auto w-full flex-1 max-w-[1440px] xl:max-w-[1600px] 2xl:max-w-[1720px] px-3 sm:px-6 lg:px-8 pt-18 sm:pt-24 pb-12 flex justify-center items-start gap-8 xl:gap-10">
         <div className="w-full flex-1 min-w-0 max-w-[980px] xl:max-w-[1100px] 2xl:max-w-[1200px] flex flex-col">
           {/* 返回文章列表 */}
-          <div className="mb-4 sm:mb-6">
+          <div className="mb-4 sm:mb-6 flex items-center justify-between">
             <Link
               href="/articles"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white bg-white/70 hover:bg-white dark:bg-neutral-900/60 dark:hover:bg-neutral-800 border border-black/5 dark:border-white/10 backdrop-blur-md shadow-xs transition-all duration-150"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>{isCollection ? "返回文章与专栏列表" : "返回文章列表"}</span>

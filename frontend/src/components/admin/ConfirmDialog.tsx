@@ -89,12 +89,12 @@ export default function ConfirmDialog({
       >
         <h3 className="text-base font-semibold text-adm-text">{title}</h3>
         <p className="mt-2 text-sm text-adm-text-secondary leading-relaxed">{message}</p>
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-3">
           <button
             type="button"
             onClick={() => triggerClose("cancel")}
             disabled={submitting}
-            className="rounded-xl border border-adm-border px-4 py-2 text-sm text-adm-text-secondary transition-colors hover:bg-adm-card-hover disabled:opacity-50 cursor-pointer"
+            className="adm-btn adm-btn--secondary"
           >
             {cancelText}
           </button>
@@ -102,11 +102,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={() => triggerClose("confirm")}
             disabled={submitting}
-            className={`rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors cursor-pointer disabled:opacity-50 ${
-              danger
-                ? "bg-red-500 hover:bg-red-600"
-                : "bg-adm-primary hover:opacity-90"
-            }`}
+            className={danger ? "adm-btn adm-btn--danger" : "adm-btn adm-btn--primary"}
           >
             {submitting ? "处理中..." : confirmText}
           </button>

@@ -35,7 +35,7 @@ async function loadAmap(key: string, securityCode: string): Promise<void> {
         amapLoaderPromise = null;
         reject(
           new Error(
-            "地图加载失败：请检查 JS API Key 是否正确、域名白名单是否包含 kanle.net"
+            "地图加载失败：请检查 JS API Key 是否正确、高德控制台域名白名单是否包含当前站点域名（如 yugold.top）"
           )
         );
         return;

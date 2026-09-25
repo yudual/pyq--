@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: "kanle-frontend",
+    name: "yublog-frontend",
     script: ".next/standalone/server.js",
     cwd: __dirname,
     exec_mode: "fork",

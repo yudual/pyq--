@@ -242,10 +242,10 @@ export default function AdminPosts({
             <button
               type="button"
               onClick={() => setShowPublish(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-adm-primary px-3.5 py-2 text-xs font-medium text-adm-primary-text shadow-sm transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+              className="adm-btn adm-btn--primary"
             >
-              <Plus className="h-3.5 w-3.5" />
-              发布动态
+              <Plus className="h-4 w-4" />
+              <span>发布动态</span>
             </button>
           )}
         </div>
@@ -404,7 +404,7 @@ function ActionBar({
         href={canonicalUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text cursor-pointer"
+        className="flex items-center gap-1 rounded-lg border border-adm-border bg-adm-card px-2.5 py-1.5 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text cursor-pointer"
         title={`在前端预览${isProject ? "项目" : isArticle ? "文章" : "动态"}`}
       >
         <ExternalLink className="h-3.5 w-3.5" />
@@ -416,14 +416,14 @@ function ActionBar({
         type="button"
         onClick={() => onToggleStatus(post.id, post.status)}
         disabled={updatingStatusId === post.id}
-        className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition cursor-pointer shrink-0 ${
+        className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition cursor-pointer shrink-0 ${
           post.status === "draft"
             ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300/40"
             : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-300/40"
         }`}
         title={post.status === "draft" ? "一键发布此草稿" : "下架并转为草稿"}
       >
-        {updatingStatusId === post.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+        {updatingStatusId === post.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
         <span>{post.status === "draft" ? "发布" : "下架"}</span>
       </button>
 
@@ -431,7 +431,7 @@ function ActionBar({
       <button
         type="button"
         onClick={onEdit}
-        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text cursor-pointer"
+        className="flex items-center gap-1 rounded-lg border border-adm-border bg-adm-card px-2.5 py-1.5 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text cursor-pointer"
         title="编辑动态"
       >
         <PenLine className="h-3.5 w-3.5" />
@@ -444,10 +444,10 @@ function ActionBar({
             onClick={() => onTogglePerm(post.id, "likesDisabled", !!post.likesDisabled)}
             disabled={permId === post.id}
             title={post.likesDisabled ? "已关闭点赞，点击开启" : "允许点赞，点击关闭"}
-            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer ${
               post.likesDisabled
-                ? "text-adm-danger bg-adm-danger-bg"
-                : "text-adm-text-secondary hover:bg-adm-card-hover"
+                ? "border-red-200 dark:border-red-900/40 text-adm-danger bg-adm-danger-bg"
+                : "border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-card-hover hover:text-adm-text"
             }`}
           >
             <Heart className="h-3.5 w-3.5" />
@@ -457,10 +457,10 @@ function ActionBar({
             onClick={() => onTogglePerm(post.id, "commentsDisabled", !!post.commentsDisabled)}
             disabled={permId === post.id}
             title={post.commentsDisabled ? "已关闭评论，点击开启" : "允许评论，点击关闭"}
-            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer ${
               post.commentsDisabled
-                ? "text-adm-danger bg-adm-danger-bg"
-                : "text-adm-text-secondary hover:bg-adm-card-hover"
+                ? "border-red-200 dark:border-red-900/40 text-adm-danger bg-adm-danger-bg"
+                : "border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-card-hover hover:text-adm-text"
             }`}
           >
             <MessageSquare className="h-3.5 w-3.5" />
@@ -472,7 +472,7 @@ function ActionBar({
       <button
         onClick={() => onPin(post.id, !!post.pinned)}
         disabled={pinningId === post.id}
-        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover disabled:opacity-50"
+        className="flex items-center gap-1 rounded-lg border border-adm-border bg-adm-card px-2.5 py-1.5 text-xs font-medium text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text disabled:opacity-50 cursor-pointer"
       >
         {post.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
         {pinningId === post.id ? "..." : post.pinned ? "取消置顶" : "置顶"}
@@ -480,7 +480,7 @@ function ActionBar({
       <button
         onClick={() => onDelete(post.id)}
         disabled={deletingId === post.id}
-        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-adm-danger transition-colors hover:bg-adm-danger-bg disabled:opacity-50"
+        className="flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-900/40 bg-adm-danger-bg px-2.5 py-1.5 text-xs font-medium text-adm-danger transition-colors hover:bg-red-100 dark:hover:bg-red-950/50 disabled:opacity-50 cursor-pointer"
       >
         <Trash2 className="h-3.5 w-3.5" />
         {deletingId === post.id ? "..." : "删除"}

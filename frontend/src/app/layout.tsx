@@ -20,8 +20,8 @@ export const viewport: Viewport = {
 
 export async function generateMetadata(): Promise<Metadata> {
   // Fetch site settings first; fall back to owner profile, then defaults.
-  let siteName = "朋友圈博客";
-  let description = "一个像微信朋友圈一样的个人博客";
+  let siteName = "YuBlog";
+  let description = "Dual 的个人博客 · 朋友圈风格";
   let keywords = "";
   let domain = "";
   let ogImage = "";
@@ -46,8 +46,8 @@ export async function generateMetadata(): Promise<Metadata> {
     if (ownerRes.ok) {
       const owner = await ownerRes.json();
       // If site settings are at defaults, use owner's nickname/bio as fallback
-      if (siteName === "朋友圈博客" && owner.nickname) siteName = owner.nickname;
-      if (description === "一个像微信朋友圈一样的个人博客" && owner.bio) {
+      if (siteName === "YuBlog" && owner.nickname) siteName = `${owner.nickname} · YuBlog`;
+      if (description === "Dual 的个人博客 · 朋友圈风格" && owner.bio) {
         description = owner.bio;
       }
     }

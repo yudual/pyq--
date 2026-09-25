@@ -207,7 +207,7 @@ export default function CollectionReader({ post }: CollectionReaderProps) {
                 {articles.length > 0 && (
                   <Link
                     href={firstArticleUrl}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all"
                   >
                     <span>从第一篇阅读</span>
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -287,9 +287,9 @@ export default function CollectionReader({ post }: CollectionReaderProps) {
 
                   {/* 悬停操作指示 */}
                   <div className="shrink-0 flex items-center justify-end sm:justify-center">
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 group-hover:bg-blue-600 group-hover:text-white dark:group-hover:bg-blue-600 dark:group-hover:text-white transition-all shadow-2xs">
                       <span>阅读本章</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
+                      <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
                     </span>
                   </div>
                 </Link>

@@ -6,7 +6,7 @@ dotenv.config();
 
 async function resetPassword() {
   await sequelize.authenticate();
-  const adminEmail = process.env.ADMIN_EMAIL || "admin@kanle.net";
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@yugold.top";
   const adminPassword = process.env.ADMIN_PASSWORD || "123456";
 
   const user = await User.findOne({ where: { email: adminEmail } });

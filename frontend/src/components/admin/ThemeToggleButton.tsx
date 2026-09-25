@@ -20,11 +20,12 @@ export default function ThemeToggleButton() {
 
   return (
     <button
+      type="button"
       onClick={() => {
         markManualOverride();
         setTheme(isDark ? "light" : "dark");
       }}
-      className="flex h-9 w-9 items-center justify-center rounded-lg text-adm-text-secondary transition-colors hover:bg-adm-card-hover hover:text-adm-text"
+      className="adm-icon-btn"
       aria-label={isDark ? "切换到白天模式" : "切换到夜间模式"}
       title={isDark ? "白天模式" : "夜间模式"}
     >

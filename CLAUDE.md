@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository layout
 
-Kanle is a WeChat-Moments-style personal blog. It has two independently run Node/TypeScript applications; there is no root workspace package or root build command:
+YuBlog is a modern WeChat-Moments-style personal blog system (customized and maintained by Dual, live at https://yugold.top). It has two independently run Node/TypeScript applications; there is no root workspace package or root build command:
 
 - `frontend/` — Next.js 16 / React 19 App Router application, styled with Tailwind CSS v4. Public pages, admin UI, RSS, and the revalidation route live under `src/app/`; shared UI is in `src/components/`; client state and request helpers are in `src/lib/`.
 - `backend/` — Express 5 API with Sequelize/MySQL. Domain routers live in `src/routes/`, data models and associations in `src/models/`, cross-cutting middleware in `src/middleware/`, and integrations/storage logic in `src/services/`.

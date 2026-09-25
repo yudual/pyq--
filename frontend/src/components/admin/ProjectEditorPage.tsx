@@ -259,10 +259,10 @@ export default function ProjectEditorPage({ projectId }: ProjectEditorPageProps)
     <div className="mx-auto flex max-w-7xl flex-col space-y-3 pb-6">
       {/* 顶部极简操作栏 */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-adm-border pb-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <Link
             href="/admin/projects"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-adm-border text-adm-text-secondary hover:bg-adm-input hover:text-adm-text"
+            className="adm-icon-btn !h-8.5 !w-8.5 shrink-0"
             title="返回项目列表"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -273,7 +273,7 @@ export default function ProjectEditorPage({ projectId }: ProjectEditorPageProps)
 
           {/* 状态标识 */}
           <span
-            className={`shrink-0 rounded-lg px-2.5 py-0.5 text-xs font-semibold border select-none ${
+            className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold border select-none ${
               currentStatus === "draft"
                 ? "border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300"
                 : "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
@@ -288,14 +288,14 @@ export default function ProjectEditorPage({ projectId }: ProjectEditorPageProps)
           <button
             type="button"
             onClick={() => setShowSettings(!showSettings)}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition cursor-pointer ${
+            className={`adm-btn !h-8.5 !px-3 text-xs ${
               showSettings
                 ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                : "border-adm-border bg-adm-card text-adm-text-secondary hover:bg-adm-input"
+                : "adm-btn--secondary"
             }`}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span>{showSettings ? "收起外链与封面" : "外链与封面设置"}</span>
+            <span>{showSettings ? "收起设置" : "外链与封面"}</span>
             {cover && (
               <span className="ml-0.5 flex h-2 w-2 rounded-full bg-emerald-500" title="已设置专属封面" />
             )}
@@ -305,7 +305,7 @@ export default function ProjectEditorPage({ projectId }: ProjectEditorPageProps)
             type="button"
             onClick={() => handleSave("draft", { stay: true })}
             disabled={!!saving}
-            className="inline-flex items-center gap-1 rounded-lg border border-adm-border bg-adm-card px-3 py-1.5 text-xs font-medium text-adm-text hover:bg-adm-input disabled:opacity-50 cursor-pointer"
+            className="adm-btn adm-btn--secondary !h-8.5 !px-3 text-xs"
             title="保存草稿 (Ctrl+S)"
           >
             {saving === "draft" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
@@ -317,7 +317,7 @@ export default function ProjectEditorPage({ projectId }: ProjectEditorPageProps)
               type="button"
               onClick={() => handleSave("draft")}
               disabled={!!saving}
-              className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-amber-300/60 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 disabled:opacity-50 cursor-pointer"
+              className="hidden sm:inline-flex adm-btn !h-8.5 !px-3 text-xs border border-amber-300/60 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100"
               title="下架此项目并转为草稿"
             >
               <span>下架为草稿</span>
@@ -328,7 +328,7 @@ export default function ProjectEditorPage({ projectId }: ProjectEditorPageProps)
             type="button"
             onClick={() => handleSave("published")}
             disabled={!!saving}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 dark:bg-white dark:text-gray-900 dark:hover:bg-emerald-200 disabled:opacity-50 cursor-pointer shadow-xs"
+            className="adm-btn adm-btn--primary !h-8.5 !px-4 text-xs font-semibold"
           >
             {saving === "published" ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -360,7 +360,7 @@ export default function ProjectEditorPage({ projectId }: ProjectEditorPageProps)
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="项目名称（例如：Kanle 朋友圈博客）..."
+          placeholder="项目名称（例如：YuBlog 个人博客）..."
           className="flex-1 rounded-xl border border-adm-border bg-adm-card px-4 py-2.5 text-base sm:text-lg font-bold text-adm-text placeholder:text-adm-text-tertiary focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
         />
         <label className="flex items-center gap-1.5 text-xs text-adm-text-secondary cursor-pointer shrink-0 border border-adm-border rounded-xl px-3 py-2.5 bg-adm-card">

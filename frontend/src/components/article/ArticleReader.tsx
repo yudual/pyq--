@@ -236,25 +236,36 @@ export default function ArticleReader({ post }: ArticleReaderProps) {
     <article className="w-full">
       {/* 博客文章头部区 */}
       <header className="mb-8 border-b border-black/[0.06] dark:border-white/[0.08] pb-6 sm:pb-8">
-        {/* 顶部导航与分类 */}
+        {/* 顶部分类与属性标识 */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <Link
-            href="/articles"
-            className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-3 py-1 font-medium text-neutral-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400 hover:border-emerald-500/40 transition-colors"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>返回文章列表</span>
-          </Link>
+          {post.collection ? (
+            <Link
+              href={`/articles/${post.collection.shortId || post.collection.id}`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/80 dark:border-blue-800/60 bg-blue-50/70 dark:bg-blue-950/40 px-3 py-1 font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100/80 dark:hover:bg-blue-900/60 transition-colors"
+            >
+              <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <span>专栏合辑: {post.collection.title}</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              {post.category && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 px-3 py-1 font-medium text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700/60">
+                  <Folder className="h-3.5 w-3.5 text-neutral-400" />
+                  {post.category}
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
-            {post.category && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 font-medium text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700/60">
-                <Folder className="h-3 w-3 text-neutral-400" />
+            {post.collection && post.category && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 px-3 py-1 font-medium text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700/60">
+                <Folder className="h-3.5 w-3.5 text-neutral-400" />
                 {post.category}
               </span>
             )}
             <span
-              className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium border ${typeConfig.badgeClass}`}
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium border ${typeConfig.badgeClass}`}
             >
               {typeConfig.label}
             </span>

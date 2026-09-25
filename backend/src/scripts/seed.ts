@@ -9,7 +9,7 @@ async function seed() {
     // 注意：不要用 sync({ alter: true })，会重复创建索引导致 MySQL 64 索引上限错误
     await sequelize.sync();
 
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@kanle.net";
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@yugold.top";
     const adminPassword = process.env.ADMIN_PASSWORD || "123456";
     const adminUsername = process.env.ADMIN_USERNAME || "admin";
 
@@ -26,11 +26,11 @@ async function seed() {
         email: adminEmail,
         username: adminUsername,
         password: await bcrypt.hash(adminPassword, 10),
-        nickname: "小予",
+        nickname: "Dual",
         // avatar 留空，前端 resolveAvatar() 会自动用 Cravatar 根据邮箱生成
         avatar: "",
         cover: "https://picsum.photos/seed/momentscover/1200/600",
-        bio: "这是一个朋友圈博客程序",
+        bio: "Dual 的个人博客 · YuBlog",
         role: "admin",
       },
     });
@@ -39,7 +39,7 @@ async function seed() {
     if (!created) {
       await admin.update({
         username: admin.username || adminUsername,
-        nickname: admin.nickname === "锦的朋友圈" ? "小予" : admin.nickname,
+        nickname: admin.nickname === "锦的朋友圈" ? "Dual" : admin.nickname,
       });
     }
 

@@ -71,11 +71,11 @@ export default function AmapConfigSection() {
         >
           高德开放平台
         </a>{" "}
-        分别创建。JS API Key 还需在控制台添加域名白名单{" "}
+        分别创建。JS API Key 还需在控制台添加你的博客域名白名单（如{" "}
         <code className="rounded bg-blue-100 px-1 dark:bg-blue-900">
-          kanle.net
+          yugold.top
         </code>
-        。
+        ）。
       </div>
 
       {loading ? (
@@ -121,8 +121,8 @@ export default function AmapConfigSection() {
           />
           <p className="mt-1.5 text-xs text-adm-text-tertiary">
             用于前端地图组件（小地图、定位选择）。创建「Web端(JS
-            API)」类型的 Key，并在控制台添加域名白名单{" "}
-            <code className="rounded bg-adm-input px-1">kanle.net</code>。
+            API)」类型的 Key，并在控制台添加域名白名单（如{" "}
+            <code className="rounded bg-adm-input px-1">yugold.top</code>）。
           </p>
 
           {/* JS API 安全密钥 */}

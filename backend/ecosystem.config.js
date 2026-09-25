@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: "kanle-backend",
+    name: "yublog-backend",
     script: "pnpm",
     args: "start",
     cwd: __dirname,

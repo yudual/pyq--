@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GripVertical, Music, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, Music, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import MusicTrackForm, { type EditableTrack } from "@/components/admin/MusicTrackForm";
 
@@ -126,7 +126,15 @@ export default function AdminMusic() {
   return <div className="mx-auto max-w-4xl p-4 sm:p-6">
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-xl font-bold text-adm-text">R2 音乐歌单</h1><p className="mt-1 text-sm text-adm-text-tertiary">浏览器直传 Cloudflare R2；前台音频直接请求 R2 公网地址，不经过 Vercel 函数。</p></div>
-      <button onClick={() => void savePlaylist()} disabled={saving} className="flex items-center gap-2 rounded-lg bg-adm-primary px-4 py-2 text-sm font-medium text-adm-primary-text disabled:opacity-50"><Save className="h-4 w-4" />保存歌单</button>
+      <button
+        type="button"
+        onClick={() => void savePlaylist()}
+        disabled={saving}
+        className="adm-btn adm-btn--primary"
+      >
+        <Save className="h-4 w-4" />
+        <span>保存歌单</span>
+      </button>
     </div>
     {message && <p className="mb-4 rounded-lg bg-adm-input px-3 py-2 text-sm text-adm-text-secondary">{message}</p>}
     <section className="mb-6 rounded-xl border border-adm-border bg-adm-card p-4">
@@ -140,7 +148,7 @@ export default function AdminMusic() {
     </section>
     <section className="rounded-xl border border-adm-border bg-adm-card p-4">
       <div className="mb-3 flex items-center justify-between"><h2 className="font-semibold text-adm-text">歌曲列表</h2>{ordering && <span className="text-xs text-adm-text-tertiary">正在保存排序…</span>}</div>
-      {loading ? <p className="text-sm text-adm-text-tertiary">加载中...</p> : tracks.length === 0 ? <p className="py-8 text-center text-sm text-adm-text-tertiary">歌单为空，请添加 R2 音频文件。</p> : <div className="space-y-2">{tracks.map((track, index) => <div key={track.id} className="flex items-center gap-3 rounded-lg bg-adm-input p-2"><GripVertical className="h-4 w-4 text-adm-text-tertiary" />{track.cover ? <img src={track.cover} alt="" className="h-10 w-10 rounded object-cover" /> : <Music className="h-8 w-8 p-2 text-adm-text-tertiary" />}<div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-adm-text">{track.name}</p><p className="truncate text-xs text-adm-text-tertiary">{track.artist || "未知艺术家"}{track.lyricMediaId ? " · R2 歌词" : track.lrc ? " · 内联歌词" : ""}</p></div><div className="flex gap-1"><button onClick={() => move(index, -1)} disabled={index === 0} className="px-2 text-adm-text-secondary disabled:opacity-30">↑</button><button onClick={() => move(index, 1)} disabled={index === tracks.length - 1} className="px-2 text-adm-text-secondary disabled:opacity-30">↓</button><button onClick={() => setEditing(track)} className="rounded p-1 text-adm-text-secondary" aria-label="编辑歌曲"><Pencil className="h-4 w-4" /></button><button onClick={() => void removeTrack(track.id)} className="rounded p-1 text-adm-danger" aria-label="移除歌曲"><Trash2 className="h-4 w-4" /></button></div></div>)}</div>}
+      {loading ? <p className="text-sm text-adm-text-tertiary">加载中...</p> : tracks.length === 0 ? <p className="py-8 text-center text-sm text-adm-text-tertiary">歌单为空，请添加 R2 音频文件。</p> : <div className="space-y-2">{tracks.map((track, index) => <div key={track.id} className="flex items-center gap-3 rounded-lg bg-adm-input p-2"><GripVertical className="h-4 w-4 text-adm-text-tertiary" />{track.cover ? <img src={track.cover} alt="" className="h-10 w-10 rounded object-cover" /> : <Music className="h-8 w-8 p-2 text-adm-text-tertiary" />}<div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-adm-text">{track.name}</p><p className="truncate text-xs text-adm-text-tertiary">{track.artist || "未知艺术家"}{track.lyricMediaId ? " · R2 歌词" : track.lrc ? " · 内联歌词" : ""}</p></div><div className="flex items-center gap-1.5 shrink-0"><button type="button" onClick={() => move(index, -1)} disabled={index === 0} className="adm-icon-btn h-8 w-8 min-h-8 min-w-8" title="上移" aria-label="上移"><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" onClick={() => move(index, 1)} disabled={index === tracks.length - 1} className="adm-icon-btn h-8 w-8 min-h-8 min-w-8" title="下移" aria-label="下移"><ArrowDown className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setEditing(track)} className="adm-icon-btn h-8 w-8 min-h-8 min-w-8" title="编辑歌曲" aria-label="编辑歌曲"><Pencil className="h-3.5 w-3.5" /></button><button type="button" onClick={() => void removeTrack(track.id)} className="adm-icon-btn adm-icon-btn--danger h-8 w-8 min-h-8 min-w-8" title="移除歌曲" aria-label="移除歌曲"><Trash2 className="h-3.5 w-3.5" /></button></div></div>)}</div>}
     </section>
   </div>;
 }

@@ -320,11 +320,11 @@ export default function QuickCoverModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2.5 border-t border-adm-border px-5 py-3.5 bg-adm-bg/60">
+        <div className="flex items-center justify-end gap-3 border-t border-adm-border px-5 py-3.5 bg-adm-bg/60">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-adm-border bg-adm-card px-4 py-2 text-xs font-medium text-adm-text hover:bg-adm-input transition cursor-pointer"
+            className="adm-btn adm-btn--secondary"
           >
             取消
           </button>
@@ -332,7 +332,7 @@ export default function QuickCoverModal({
             type="button"
             onClick={handleSave}
             disabled={saving || uploading}
-            className="flex items-center gap-1.5 rounded-xl bg-adm-primary px-5 py-2 text-xs font-semibold text-adm-primary-text hover:opacity-90 disabled:opacity-50 transition shadow-sm cursor-pointer"
+            className="adm-btn adm-btn--primary"
           >
             {saving ? (
               <>

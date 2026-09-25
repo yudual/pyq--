@@ -1015,7 +1015,7 @@ export default function MarkdownEditor({
               onScroll={handleEditorScroll}
               placeholder={placeholder}
               spellCheck={false}
-              className="absolute inset-0 w-full h-full resize-none bg-transparent p-6 sm:p-8 font-mono text-[14.5px] leading-[1.8] text-neutral-800 dark:text-neutral-200 focus:outline-none placeholder:text-neutral-400 dark:placeholder:text-neutral-600 selection:bg-emerald-500/20 overflow-y-auto editor-scrollbar"
+              className="absolute inset-0 w-full h-full resize-none bg-transparent p-6 sm:p-8 md:p-10 font-sans text-[15px] sm:text-[15.5px] leading-[1.85] tracking-normal text-neutral-800 dark:text-neutral-100 focus:outline-none placeholder:text-neutral-400/70 dark:placeholder:text-neutral-500/70 selection:bg-emerald-500/25 overflow-y-auto editor-scrollbar"
             />
           </div>
         )}
@@ -1026,11 +1026,11 @@ export default function MarkdownEditor({
             ref={previewRef}
             onScroll={handlePreviewScroll}
             onClick={handlePreviewClick}
-            className="relative flex-1 min-w-0 min-h-0 h-full overflow-y-auto p-6 sm:p-8 bg-neutral-50/50 dark:bg-[#141417]/50 editor-scrollbar"
+            className="relative flex-1 min-w-0 min-h-0 h-full overflow-y-auto p-6 sm:p-8 md:p-10 bg-neutral-50/40 dark:bg-[#121215]/50 editor-scrollbar"
           >
             {value ? (
               <div
-                className="article-content rich-content max-w-none text-[15px] leading-[1.8] text-neutral-800 dark:text-neutral-200"
+                className="article-content rich-content max-w-none text-[15px] sm:text-[15.5px] leading-[1.85] text-neutral-800 dark:text-neutral-100"
                 dangerouslySetInnerHTML={{ __html: previewHtml }}
               />
             ) : (

@@ -107,9 +107,9 @@ Comment.init(
     tableName: "comments",
     indexes: [
       // 访客回复通知：按被回复者邮箱查询
-      { name: "idx_comments_reply_to_email", fields: ["replyToEmail"] },
+      { name: "idx_comments_reply_to_email", fields: ["reply_to_email"] },
       // 通知页：按点赞者昵称反查邮箱
-      { name: "idx_comments_author_name", fields: ["authorName"] },
+      { name: "idx_comments_author_name", fields: ["author_name"] },
     ],
   }
 );
