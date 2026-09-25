@@ -30,12 +30,29 @@ async function indexExists(table: string, indexName: string): Promise<boolean> {
   return (rows as unknown[]).length > 0;
 }
 
-function resolveColumns(model: typeof Post | typeof Comment | typeof Media, attrs: string[]): string[] {
-  const attributes = (model as any).getAttributes();
-  return attrs.map((attr) => {
-    const col = attributes[attr]?.field || attr;
-    return `\`${col}\``;
-  });
+function resolveColumns(
+  model: typeof Post | typeof Comment | typeof Media,
+  table: string,
+  attrs: string[]
+): Promise<string[]> {
+  return (async () => {
+    const dbName = (sequelize as any).config.database as string;
+    const [rows] = await sequelize.query(
+      "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE table_schema = ? AND table_name = ?",
+      { replacements: [dbName, table] }
+    );
+    const existing = new Set((rows as Array<{ COLUMN_NAME: string }>).map((r) => r.COLUMN_NAME));
+
+    return attrs.map((attr) => {
+      const raw = (model as any).getAttributes()[attr];
+      const explicit = raw?.field;
+      const snake = attr.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+      for (const candidate of [explicit, attr, snake]) {
+        if (candidate && existing.has(candidate)) return `\`${candidate}\``;
+      }
+      throw new Error(`列不存在：${table}.${attr}（候选：${explicit || "-"} / ${attr} / ${snake}）`);
+    });
+  })();
 }
 
 /**
@@ -48,7 +65,7 @@ export async function migrateIndexes() {
       console.log(`Index exists, skipped: ${plan.name}`);
       continue;
     }
-    const columns = resolveColumns(plan.model, plan.attrs).join(", ");
+    const columns = (await resolveColumns(plan.model, plan.table, plan.attrs)).join(", ");
     await sequelize.query(`CREATE INDEX \`${plan.name}\` ON \`${plan.table}\` (${columns})`);
     console.log(`Created index: ${plan.name} on ${plan.table} (${columns})`);
   }

@@ -1,8 +1,7 @@
 name: Build and Deploy to VPS
 
+# 改为仅手动触发：构建已迁移到甲骨文 or4 构建机（push 自动构建曾在 GitHub 失败且占用额度）
 on:
-  push:
-    branches: [ master, main ]
   workflow_dispatch:
 
 jobs:
