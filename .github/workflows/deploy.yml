@@ -1,11 +1,13 @@
-name: Build and Deploy to VPS
+name: Build Check
 
-# 改为仅手动触发：构建已迁移到甲骨文 or4 构建机（push 自动构建曾在 GitHub 失败且占用额度）
+# 仅做构建验证：发布由甲骨文 or4 构建机流程完成（scripts 流程见仓库文档）
 on:
+  push:
+    branches: [ master, main ]
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -14,12 +16,12 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 12
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
           # 根目录 lockfile 被 .gitignore 忽略，缓存依赖需指向已跟踪的子目录 lockfile
           cache-dependency-path: |
@@ -33,80 +35,11 @@ jobs:
           pnpm install
           pnpm build
 
-      # 2. 编译前端（生产 Standalone 独立产物，零开发依赖）
+      # 2. 编译前端（生产 Standalone 独立产物）
       - name: Build Frontend
         run: |
           cd frontend
           pnpm install
           pnpm build
-          # 补充 standalone 运行所需的静态文件
           cp -r .next/static .next/standalone/.next/static
           cp -r public .next/standalone/public
-
-      # 3. 准备轻量部署目录
-      - name: Prepare Release Bundle
-        run: |
-          mkdir -p release/backend release/frontend/.next release/deploy
-
-          # 后端产物
-          cp -r backend/dist release/backend/
-          cp backend/package.json release/backend/
-          cp backend/ecosystem.config.js release/backend/
-
-          # 后端生产依赖（仅打包生产依赖，极度轻量）
-          cd backend
-          pnpm install --prod
-          cp -r node_modules ../release/backend/
-          cd ..
-
-          # 前端产物（全自包含 standalone）
-          cp -r frontend/.next/standalone release/frontend/.next/
-          cp -r frontend/.next/static release/frontend/.next/standalone/.next/static
-          cp -r frontend/public release/frontend/.next/standalone/public
-          cp frontend/ecosystem.config.js release/frontend/
-
-          # Nginx 配置
-          cp -r deploy release/
-
-      # 4. 通过 SSH 同步到 VPS 并平滑热重启
-      - name: Deploy to VPS
-        if: ${{ env.VPS_HOST != '' }}
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
-          VPS_USER: ${{ secrets.VPS_USER || 'root' }}
-          VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
-          TARGET_DIR: ${{ secrets.DEPLOY_PATH || '/var/www/blog' }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$VPS_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p $VPS_PORT -H "$VPS_HOST" >> ~/.ssh/known_hosts
-
-          # 确保远程目录存在
-          ssh -p $VPS_PORT $VPS_USER@$VPS_HOST "mkdir -p $TARGET_DIR/backend $TARGET_DIR/frontend $TARGET_DIR/deploy"
-
-          # Rsync 增量传输（排除敏感的 .env、日志和本地上传文件）
-          rsync -avz -e "ssh -p $VPS_PORT" --exclude='.env' --exclude='.env.local' --exclude='logs' --exclude='uploads' \
-            release/backend/ $VPS_USER@$VPS_HOST:$TARGET_DIR/backend/
-
-          rsync -avz -e "ssh -p $VPS_PORT" --exclude='.env.local' --exclude='logs' \
-            release/frontend/ $VPS_USER@$VPS_HOST:$TARGET_DIR/frontend/
-
-          rsync -avz -e "ssh -p $VPS_PORT" \
-            release/deploy/ $VPS_USER@$VPS_HOST:$TARGET_DIR/deploy/
-
-          # 远程执行 PM2 平滑重启
-          ssh -p $VPS_PORT $VPS_USER@$VPS_HOST "
-            cd $TARGET_DIR
-
-            # 后端启动或重载
-            cd backend
-            pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
-
-            # 前端启动或重载
-            cd ../frontend
-            pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
-
-            pm2 save
-          "
